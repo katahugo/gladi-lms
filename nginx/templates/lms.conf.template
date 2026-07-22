@@ -1,0 +1,102 @@
+# =============================================================================
+# Site config — Gladi LMS
+# =============================================================================
+# HTTP (80): melayani challenge ACME Let's Encrypt + redirect ke HTTPS.
+# HTTPS (443): reverse proxy ke Next.js app.
+#
+# Catatan Tahap B6: saat sertifikat belum ada, blok 443 akan gagal reload.
+# Gunakan nginx/lms.conf.bootstrap saat provisioning pertama (lihat
+# scripts/provision-ssl.sh), lalu ganti ke file ini setelah sertifikat terbit.
+# =============================================================================
+
+# ---- HTTP: ACME challenge + redirect ----
+server {
+    listen 80;
+    server_name _;
+
+    # Healthcheck lokal untuk healthcheck container nginx sendiri
+    location = /health {
+        access_log off;
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+
+    # Let's Encrypt webroot challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Sisanya redirect ke HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---- HTTPS: aplikasi utama ----
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name _;
+
+    # Sertifikat Let's Encrypt (path standar certbot untuk domain pertama)
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+
+    # Hardening TLS (Mozilla intermediate, kompatibel luas)
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # ---- Endpoint health app (tanpa rate limit, untuk Uptime Kuma) ----
+    location = /api/health {
+        proxy_pass http://nextjs_app;
+        proxy_set_header Host $host;
+        access_log off;
+    }
+
+    # ---- Auth endpoints: rate limit ketat anti brute-force ----
+    location ~ ^/api/auth/(signin|callback|register|reset) {
+        limit_req zone=auth burst=10 nodelay;
+        proxy_pass http://nextjs_app;
+        include /etc/nginx/includes/proxy_common.conf;
+    }
+
+    # ---- API lain: rate limit longgar ----
+    location /api/ {
+        limit_req zone=api burst=50 nodelay;
+        proxy_pass http://nextjs_app;
+        include /etc/nginx/includes/proxy_common.conf;
+    }
+
+    # ---- Webhook payment gateway: tidak di-rate-limit (retry gateway harus lolos) ----
+    location /api/webhooks/ {
+        proxy_pass http://nextjs_app;
+        include /etc/nginx/includes/proxy_common.conf;
+        # Body besar untuk payload webhook
+        client_max_body_size 2m;
+    }
+
+    # ---- Aset statis Next.js: cache agresif (immutable fingerprint) ----
+    location /_next/static/ {
+        proxy_pass http://nextjs_app;
+        proxy_set_header Host $host;
+        proxy_cache_valid 200 365d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # ---- Semua request lain ----
+    location / {
+        proxy_pass http://nextjs_app;
+        include /etc/nginx/includes/proxy_common.conf;
+    }
+}

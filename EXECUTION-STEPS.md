@@ -357,5 +357,5 @@ docker compose exec app npx drizzle-kit migrate
 
 ---
 
-**Urutan perintah yang disarankan:** A1 → A2/A3 → A4 → A5 → A6 → A7 → A8 → (B1–B6 saat Anda siap dengan Azure) → C1–C5 → D1–D5 → E1+.
-Perintah cukup sebutkan kodenya, misal: "kerjakan A1" atau "lanjut A2 sampai A4".
+**Urutan perintah yang disarankan:** ~~A1–A8~~ (selesai) → **B1–B6 oleh Anda** (isi kolom "Hasil Anda" di tiap langkah) → C1–C5 → D1–D5 → E1+.
+Perintah cukup sebutkan kodenya, misal: "kerjakan C1" atau "B1 sudah, lanjut B2".

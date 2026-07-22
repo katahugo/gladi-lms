@@ -1,0 +1,116 @@
+# =============================================================================
+# CI/CD — Gladi LMS
+# =============================================================================
+# Push ke main:
+#   1. Job "quality": install, lint, type-check, build (gagal = stop di sini)
+#   2. Job "docker":  build image app + worker di RUNNER (bukan VPS, plan §3),
+#                     push ke GHCR (tag :latest dan :sha-<commit>)
+#   3. Job "deploy":  SSH ke VPS → jalankan scripts/deploy.sh di server
+#                     (pull image → migrasi DB → restart → health check +
+#                      rollback otomatis ke image sebelumnya jika gagal)
+#
+# Secrets yang harus diset di GitHub repo (Settings → Secrets and variables →
+# Actions), diisi saat Tahap B6:
+#   VPS_HOST         — IP/domain VPS Azure
+#   VPS_USER         — user SSH non-root
+#   VPS_PORT         — port SSH custom (mis. 2222)
+#   VPS_SSH_KEY      — private key untuk user deploy
+#
+# GITHUB_TOKEN bawaan dipakai untuk push image ke GHCR (packages: write).
+# =============================================================================
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/app
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Lint, type-check & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+      - run: npm run build:worker
+
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Build & push images ke GHCR
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # Image app (target default) — :latest + :sha-xxx
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          target: app
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
+
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy ke VPS via SSH
+    needs: docker
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/gladi-lms
+            export IMAGE_TAG="${{ needs.docker.outputs.image_tag }}"
+            ./scripts/deploy.sh

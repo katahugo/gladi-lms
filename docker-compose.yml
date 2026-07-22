@@ -1,0 +1,279 @@
+# =============================================================================
+# LMS Gladi — Docker Compose (1 VPS Azure, B2ms 2 vCPU / 8GB RAM)
+# =============================================================================
+# Semua service berjalan dalam network internal "lms_net".
+# Hanya nginx yang mengekspos port 80/443 ke publik.
+# Postgres, Redis, MinIO (API), worker TIDAK diekspos ke internet.
+#
+# Memory limit diset agar total tidak melebihi kapasitas B2ms (8GB):
+#   app 1500M + worker 1024M + postgres 1536M + redis 512M + minio 512M
+#   + nginx 128M + uptime-kuma 256M + certbot 128M = ~5.6GB, sisa untuk OS.
+# =============================================================================
+
+name: gladi-lms
+
+x-restart-policy: &restart_policy
+  restart: unless-stopped
+
+services:
+  # ---------------------------------------------------------------------------
+  # Reverse proxy + SSL termination (Let's Encrypt via certbot)
+  # ---------------------------------------------------------------------------
+  nginx:
+    <<: *restart_policy
+    image: nginx:1.27-alpine
+    container_name: lms_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/includes:/etc/nginx/includes:ro
+      # Disimpan di /bootstrap (bukan conf.d) agar tidak ikut ter-load;
+      # dipakai scripts/provision-ssl.sh saat provisioning SSL pertama kali.
+      - ./nginx/lms.conf.bootstrap:/bootstrap/lms.conf.bootstrap:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+      # Nonaktifkan template resolver bawaan (kita pakai upstream statis)
+      NGINX_ENVSUBST_FILTER: APP_DOMAIN
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - lms_net
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # SSL certificate issuer/renewer
+  # ---------------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:v2.11.0
+    container_name: lms_certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+    # Entrypoint diganti di Tahap B6 saat provisioning SSL pertama kali.
+    # Default: renew setiap 12 jam (Let's Encrypt merekomendasikan cek 2x/hari).
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    networks:
+      - lms_net
+    mem_limit: 128m
+    cpus: 0.1
+
+  # ---------------------------------------------------------------------------
+  # Aplikasi Next.js (web UI + API routes)
+  # Image di-build di GitHub Actions (CI), bukan di VPS.
+  # ---------------------------------------------------------------------------
+  app:
+    <<: *restart_policy
+    image: ${APP_IMAGE:-ghcr.io/katahugo/gladi-lms/app:latest}
+    container_name: lms_app
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - lms_net
+    mem_limit: 1536m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ---------------------------------------------------------------------------
+  # Background worker (BullMQ): sertifikat PDF, email, rekonsiliasi pembayaran
+  # ---------------------------------------------------------------------------
+  worker:
+    <<: *restart_policy
+    image: ${APP_IMAGE:-ghcr.io/katahugo/gladi-lms/app:latest}
+    container_name: lms_worker
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      target: worker
+    command: ["node", "worker.js"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - lms_net
+    mem_limit: 1024m
+    cpus: 0.5
+    healthcheck:
+      # Worker sehat jika proses node berjalan dan bisa ping Redis.
+      test: ["CMD-SHELL", "node -e \"const r=require('ioredis');new r(process.env.REDIS_URL).ping().then(p=>process.exit(p==='PONG'?0:1)).catch(()=>process.exit(1))\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 — tidak diekspos ke publik
+  # ---------------------------------------------------------------------------
+  postgres:
+    <<: *restart_policy
+    image: postgres:16-alpine
+    container_name: lms_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Tuning ringan untuk B2ms 8GB (lihat plan §3)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    command: >
+      postgres
+      -c shared_buffers=512MB
+      -c effective_cache_size=2GB
+      -c max_connections=50
+      -c work_mem=8MB
+      -c maintenance_work_mem=128MB
+      -c wal_compression=on
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - lms_net
+    mem_limit: 1536m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — session cache + BullMQ queue
+  # ---------------------------------------------------------------------------
+  redis:
+    <<: *restart_policy
+    image: redis:7-alpine
+    container_name: lms_redis
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 384mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    volumes:
+      - redisdata:/data
+    networks:
+      - lms_net
+    mem_limit: 512m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # MinIO — object storage S3-compatible (PDF, gambar, aset materi)
+  # API tidak diekspos; konsol admin hanya di localhost VPS (SSH tunnel).
+  # ---------------------------------------------------------------------------
+  minio:
+    <<: *restart_policy
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: lms_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - miniodata:/data
+    ports:
+      # Konsol admin hanya bisa diakses via SSH tunnel: ssh -L 9001:localhost:9001
+      - "127.0.0.1:9001:9001"
+    networks:
+      - lms_net
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Uptime Kuma — monitoring self-hosted, UI hanya di localhost VPS
+  # ---------------------------------------------------------------------------
+  uptime-kuma:
+    <<: *restart_policy
+    image: louislam/uptime-kuma:1.23.16-alpine
+    container_name: lms_uptime_kuma
+    volumes:
+      - uptimekumadata:/app/data
+    ports:
+      # Hanya via SSH tunnel: ssh -L 3001:localhost:3001
+      - "127.0.0.1:3001:3001"
+    networks:
+      - lms_net
+    mem_limit: 256m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  lms_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  miniodata:
+    driver: local
+  uptimekumadata:
+    driver: local
+  certbot_www:
+    driver: local
+  certbot_conf:
+    driver: local

@@ -1,0 +1,43 @@
+# =============================================================================
+# .dockerignore untuk build context ./app
+# Membuat context kecil & cache-friendly (penting untuk CI).
+# =============================================================================
+
+.git
+.gitignore
+
+# Dependensi & hasil build lokal (dibuat ulang di dalam image)
+node_modules
+.next
+out
+build
+dist
+*.tsbuildinfo
+
+# Env & secret (di-inject saat runtime via docker-compose, bukan di image)
+.env
+.env.*
+!.env.example
+
+# Dokumentasi & tooling lokal
+*.md
+.vscode
+.idea
+Dockerfile
+.dockerignore
+!drizzle/
+!drizzle.config.ts
+
+# Testing
+coverage
+playwright-report
+test-results
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
