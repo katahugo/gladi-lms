@@ -28,8 +28,20 @@ if [ -z "${AZURE_STORAGE_ACCOUNT:-}" ]; then
   exit 1
 fi
 
-: "${AZURE_STORAGE_CONTAINER:?AZURE_STORAGE_CONTAINER wajib diisi di .env}"
-: "${AZURE_STORAGE_SAS_TOKEN:?AZURE_STORAGE_SAS_TOKEN wajib diisi di .env}"
+if [ -z "${AZURE_STORAGE_CONTAINER:-}" ]; then
+  echo "GALAT: AZURE_STORAGE_CONTAINER belum diisi di .env" >&2; exit 1
+fi
+
+# SAS token sering mengandung karakter & yang merusak parsing shell.
+# Pastikan di .env nilainya dibungkus tanda kutip TUNGGAL:
+#   AZURE_STORAGE_SAS_TOKEN='sv=...&sig=...'
+# (tanpa kutip, karakter & dianggap command separator → variabel tidak terdefinisi)
+if [ -z "${AZURE_STORAGE_SAS_TOKEN:-}" ]; then
+  echo "GALAT: AZURE_STORAGE_SAS_TOKEN belum terdefinisi di .env" >&2
+  echo "  Pastikan di .env formatnya: AZURE_STORAGE_SAS_TOKEN='sv=...&sig=...'" >&2
+  echo "  (kutip TUNGGAL wajib karena SAS token mengandung karakter &)" >&2
+  exit 1
+fi
 
 echo "==> Kredensial Azure Blob: OK (${AZURE_STORAGE_ACCOUNT} / ${AZURE_STORAGE_CONTAINER})"
 

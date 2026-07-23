@@ -480,7 +480,10 @@ Tambahkan di akhir file .env:
 ```
 AZURE_STORAGE_ACCOUNT=gladilmsbackup
 AZURE_STORAGE_CONTAINER=lms-backups
-AZURE_STORAGE_SAS_TOKEN=sv=2025-01-05&ss=b&srt=sco&sp=rwdl&se=2028-07-23T...&sig=...
+# PENTING: SAS token mengandung karakter & — WAJIB dibungkus kutip TUNGGAL (').
+# Tanpa kutip, karakter & dianggap command separator oleh bash dan variabel
+# tidak akan terdefinisi (error "wajib diisi di .env" padahal sudah diisi).
+AZURE_STORAGE_SAS_TOKEN='sv=2025-01-05&ss=b&srt=sco&sp=rwdl&se=2028-07-23T...&sig=...'
 ```
 Simpan (Ctrl+O, Enter, Ctrl+X). Lalu:
 ```bash
