@@ -35,6 +35,9 @@ backup/
 dump/
 *.sql
 *.sql.gz
+# KECUALI: file migrasi Drizzle WAJIB ter-commit (bukan dump database)
+!app/drizzle/**/*.sql
+!**/drizzle/**/*.sql
 
 # ---- Testing & coverage ----
 coverage/
