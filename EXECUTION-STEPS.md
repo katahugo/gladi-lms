@@ -39,7 +39,7 @@ Indonesia Central` | ✅ |
 | B3 | Hardening OS (user non-root, SSH key-only, ufw, fail2ban, unattended-upgrades, swap 4GB) | Server aman | User SSH: `deploy` / SSH key: `sudah` | ✅ |
 | B4 | Install Docker + mount disk data | Docker siap | Versi Docker: `29.6.2` | ✅ |
 | B5 | Cloudflare: A record → IP VPS, proxy ON, SSL Full (strict) | Domain resolving ke VPS | Domain: `gladi.id` | ✅ |
-| B6 | Deploy compose pertama + Certbot SSL + isi secrets GitHub | https://domain hidup, CI/CD aktif | URL aktif: `...` / Secrets GitHub: `sudah/belum` | ⬜ |
+| B6 | Deploy compose pertama + Certbot SSL + isi secrets GitHub | https://domain hidup, CI/CD aktif | URL aktif: `https://gladi.id` (health OK) / Secrets GitHub: `belum` | ✅ |
 
 ---
 
@@ -348,6 +348,7 @@ curl -s https://<DOMAIN_ANDA>/api/health   # lewat Cloudflare+SSL → {"status":
 ```
 
 **Bagian 6 — Isi secrets GitHub agar CI/CD (A7) aktif:**
+*(Catatan: langkah ini tersisa — pipeline belum aktif sampai 4 secrets diisi. Setelah itu, deploy tidak lagi manual di VPS.)*
 1. Di VPS: `cat ~/.ssh/authorized_keys` — pastikan ada key Anda. Pipeline butuh key **khusus deploy**; buat yang baru:
    ```bash
    ssh-keygen -t ed25519 -f ~/.ssh/github-deploy -N "" -C "github-actions"
@@ -357,7 +358,7 @@ curl -s https://<DOMAIN_ANDA>/api/health   # lewat Cloudflare+SSL → {"status":
 2. Di browser: repo GitHub → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**, buat 4 secrets:
    - `VPS_HOST` = IP VPS dari B1
    - `VPS_USER` = `deploy`
-   - `VPS_PORT` = `2222`
+   - `VPS_PORT` = port SSH dari B2 (deployment ini: `2020`)
    - `VPS_SSH_KEY` = isi private key yang disalin di atas
 3. Uji pipeline: push commit apa pun ke `main` (atau di GitHub: tab **Actions** → workflow **deploy** → **Run workflow**) → pantau sampai 3 job hijau.
 
@@ -376,6 +377,33 @@ curl -s https://<DOMAIN_ANDA>/api/health   # lewat Cloudflare+SSL → {"status":
 > - **`docker compose exec app ...` gagal "container not running"** → app belum Up. Lakukan migrasi via `run --rm --no-deps` seperti Bagian 5 langkah 3 (jangan `exec` ke app yang belum jalan).
 > - **App "unhealthy" setelah up** → hampir selalu migrasi belum dijalankan atau `DATABASE_URL` salah. Cek `docker compose logs app`.
 > - **`curl https://domain` 502 Bad Gateway** → nginx jalan tapi app belum/mati. Cek `docker compose ps app` dan `docker compose logs app`.
+
+### Ringkasan Deployment Aktual (vm-gladi-lms — Indonesia Central)
+
+Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
+
+| Aspek | Nilai Aktual |
+|---|---|
+| IP publik | `70.153.16.78` (Static) |
+| Nama VM / Region | `vm-gladi-lms` / Indonesia Central |
+| Domain | `gladi.id` (Cloudflare proxied, SSL Full strict) |
+| Port SSH custom | `2020` (dibatasi IP admin di NSG) |
+| User SSH | `deploy` |
+| Versi Docker | `29.6.2` |
+| URL health publik | `https://gladi.id/api/health` → `{"status":"ok"}` |
+| Service berjalan | nginx, app, worker, postgres, redis, minio, certbot (semua Up) |
+
+**Pelajaran penting yang memperbaiki error selama deployment (terdokumentasi agar tidak terulang):**
+
+1. **`/health` 404** → `default.conf` bawaan image nginx mencuri request `Host: localhost`. Diperbaiki dengan `nginx/templates/default.conf.template` kosong yang menimpa bawaan + `default_server` + IPv6.
+2. **Nginx crash saat bootstrap** → `upstream app:3000` gagal resolve ketika app belum ada. Diperbaiki dengan `resolver 127.0.0.11` + `proxy_pass` via variabel (lazy resolve).
+3. **Certbot menggantung** → entrypoint renew-loop service `certbot` mengabaikan argumen `certonly`. Diperbaiki dengan service `certbot-issue` terpisah (tanpa override entrypoint).
+4. **Container macet "Created"** → `docker compose up/run` tanpa `--no-deps` ikut menaikkan dependensi yang belum siap. Solusi: selalu `--no-deps` pada langkah bootstrap.
+5. **`lms_app` menjalankan `worker.js`** → service `app` tidak menentukan `target: app`, jadi `build` memakai target terakhir Dockerfile (worker). Diperbaiki dengan `target: app` + `command: ["node","server.js"]`.
+6. **`URIError: URI malformed` pada Redis** → `REDIS_URL` menginterpolasi password mentah berkarakter khusus. Diperbaiki dengan kredensial terpisah `REDIS_HOST/PORT/PASSWORD`.
+7. **`MODULE_NOT_FOUND /app/worker.js`** → `app` dan `worker` berbagi tag `app:latest`; build bersamaan menimpa satu sama lain. Diperbaiki dengan tag terpisah `app:latest` vs `worker:latest` (compose, CI/CD, deploy.sh diselaraskan).
+
+**Tersisa dari B6:** Bagian 6 (isi 4 secrets GitHub: `VPS_HOST=70.153.16.78`, `VPS_USER=deploy`, `VPS_PORT=2020`, `VPS_SSH_KEY`). Setelah itu pipeline CI/CD (A7) aktif dan deploy tidak lagi manual.
 
 ## Tahap C — Fitur Inti MVP (lokal, setelah A4–A6)
 
@@ -408,5 +436,5 @@ curl -s https://<DOMAIN_ANDA>/api/health   # lewat Cloudflare+SSL → {"status":
 
 ---
 
-**Urutan perintah yang disarankan:** ~~A1–A8~~ (selesai) → **B1–B6 oleh Anda** (isi kolom "Hasil Anda" di tiap langkah) → C1–C5 → D1–D5 → E1+.
-Perintah cukup sebutkan kodenya, misal: "kerjakan C1" atau "B1 sudah, lanjut B2".
+**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live: `https://gladi.id`, 23 Jul 2026) → **C1–C5 berikutnya** → D1–D5 → E1+.
+Tersisa dari B: Bagian 6 (isi 4 secrets GitHub agar CI/CD aktif). Perintah cukup sebutkan kodenya, misal: "kerjakan C1".

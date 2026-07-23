@@ -1,6 +1,6 @@
 # PRD — Platform LMS Penjualan Kursus Digital
 **Versi:** 2.0 — Self-Hosted di Azure VPS
-**Status:** Draft untuk validasi
+**Status:** Infrastruktur inti live (23 Jul 2026, `https://gladi.id`) — fitur MVP dalam pengerjaan
 **Skala target:** Produksi (production-grade), fitur lengkap, infrastruktur self-managed
 
 > Perubahan dari v1.0: seluruh infrastruktur (aplikasi + database) dipindahkan ke **1 VPS Azure milik sendiri**, tidak lagi memakai Vercel maupun Supabase. Autentikasi memakai library open-source gratis, bukan Supabase Auth.
@@ -72,13 +72,16 @@ Semua komponen inti (aplikasi web, API, database, reverse proxy) berjalan sebaga
 
 | Komponen | Rekomendasi Awal |
 |---|---|
-| **VM Series** | Azure **B-series** (contoh: Standard_B4ms — 4 vCPU, 16GB RAM) untuk tahap awal produksi |
+| **VM Series** | Azure **B-series** — rekomendasi awal Standard_B4ms (4 vCPU, 16GB RAM); **deployment aktual: Standard_B2ms (2 vCPU, 8GB RAM)** untuk menekan biaya baseline, dengan jalur resize ke B4ms tanpa rebuild bila trafik naik |
 | **OS** | Ubuntu Server 24.04 LTS |
-| **Storage** | Premium SSD, minimal 128GB (pisahkan disk data untuk volume Docker/database agar mudah di-resize) |
-| **Networking** | Azure NSG (Network Security Group) — hanya buka port 22 (SSH, dibatasi IP tertentu), 80, 443 |
-| **Static IP** | Azure Public IP (static) agar domain & DNS stabil |
+| **Storage** | Premium SSD, minimal 128GB (pisahkan disk data untuk volume Docker/database agar mudah di-resize). **Aktual: OS 128GB + disk data 64GB termount di `/data` (data-root Docker dipindah ke sana)** |
+| **Networking** | Azure NSG (Network Security Group) — hanya buka port SSH custom (dibatasi IP admin), 80, 443. **Aktual: SSH di port 2020 (bukan 22), dibatasi IP admin** |
+| **Static IP** | Azure Public IP (static) agar domain & DNS stabil. **Aktual: `70.153.16.78`** |
+| **Region** | Terdekat dengan mayoritas target siswa. **Aktual: Indonesia Central** |
 
-> Catatan: B-series cocok karena sifatnya *burstable* (murah saat idle, bisa burst saat trafik naik) — cocok untuk LMS yang traffic-nya tidak konstan sepanjang hari. Kalau nanti pemakaian CPU konsisten tinggi, pertimbangkan pindah ke D-series.
+> Catatan: B-series cocok karena sifatnya *burstable* (murah saat idle, bisa burst saat trafik naik) — cocok untuk LMS yang traffic-nya tidak konstan sepanjang hari. Kalau nanti pemakaian CPU konsisten tinggi, pertimbangkan pindah ke D-series. Deployment aktual memakai B2ms (lihat plan keputusan di `.kilo/plans/`), yang cukup untuk MVP hingga beberapa ratus siswa aktif dengan tuning memory per container.
+
+> **Status implementasi:** Infrastruktur bagian ini **sudah ter-deploy dan go-live** pada 23 Juli 2026 di `https://gladi.id` (VM `vm-gladi-lms`). Rincian nilai aktual dan pelajaran perbaikan selama deployment terdokumentasi di `EXECUTION-STEPS.md` (bagian "Ringkasan Deployment Aktual").
 
 ### 5.3 Diagram Arsitektur (High-Level, 1 VPS)
 
@@ -139,7 +142,7 @@ Semua komponen inti (aplikasi web, API, database, reverse proxy) berjalan sebaga
 - **Redis** menangani session cache & job queue (dipakai bareng BullMQ untuk background job seperti generate sertifikat dan kirim email, menggantikan peran Inngest/Supabase Edge Functions di versi sebelumnya).
 
 ### 5.5 Keamanan (Disesuaikan untuk Self-Hosted)
-- SSH hanya via key-based auth (disable password login), port SSH idealnya diubah dari default 22.
+- SSH hanya via key-based auth (disable password login), port SSH diubah dari default 22. **Aktual: port 2020 + user non-root `deploy` + root login dimatikan.**
 - Firewall berlapis: Azure NSG di level cloud + `ufw` di level OS.
 - `fail2ban` untuk mencegah brute-force ke SSH/login endpoint.
 - Update keamanan OS & Docker image terjadwal (unattended-upgrades untuk patch kritikal).
@@ -228,7 +231,8 @@ Tidak berubah dari v1.0 — struktur tabel sama, hanya lokasi database yang beru
 Karena tidak lagi pakai managed hosting, berikut yang perlu disiapkan tim secara eksplisit:
 
 ### 8.1 Deployment
-- Setup CI/CD sederhana: GitHub Actions yang SSH ke VPS, `git pull` + `docker compose up -d --build` saat ada push ke branch `main`.
+- Setup CI/CD sederhana: GitHub Actions yang **build image (app + worker, tag terpisah) di runner → push ke GHCR → SSH ke VPS** untuk `docker compose pull && up -d`. Build **tidak** dilakukan di VPS agar CPU/RAM B2ms tidak terbebani (kecuali deploy pertama kali yang memang build manual di VPS).
+- Migrasi database dijalankan di VPS sebagai container one-shot di network internal (Postgres tidak diekspos), sebelum service di-restart; deploy.sh menyertakan health check + rollback otomatis ke image sebelumnya bila gagal.
 - Gunakan `docker compose` dengan file `.env` terpisah untuk secret (jangan commit ke repo).
 
 ### 8.2 Backup & Disaster Recovery
@@ -291,9 +295,16 @@ Karena tidak lagi pakai managed hosting, berikut yang perlu disiapkan tim secara
 
 ## 12. Langkah Selanjutnya
 
-1. Provisioning VPS Azure (pilih ukuran VM, region terdekat dengan mayoritas target siswa).
-2. Setup domain + Cloudflare (DNS & proteksi) mengarah ke IP VPS.
-3. Bangun `docker-compose.yml` awal: Nginx, Next.js app, PostgreSQL, Redis, MinIO.
-4. Implementasi Auth.js di codebase Next.js.
-5. Tentukan pilihan final video hosting (Cloudflare Stream vs Mux) berdasarkan estimasi jam tonton bulanan.
-6. Setup backup terjadwal & monitoring sebelum go-live (jangan ditunda sampai setelah launching).
+> **Status per 23 Juli 2026:** infrastruktur inti **sudah go-live** di `https://gladi.id` (Tahap A & B dari `EXECUTION-STEPS.md` selesai). Item di bawah diperbarui untuk mencerminkan kenyataan terkini.
+
+Selesai:
+1. ~~Provisioning VPS Azure~~ — VM `vm-gladi-lms` (B2ms, Indonesia Central, IP `70.153.16.78`) aktif.
+2. ~~Setup domain + Cloudflare~~ — `gladi.id` proxied, SSL Full (strict), sertifikat Let's Encrypt terbit.
+3. ~~Bangun `docker-compose.yml`~~ — Nginx, Next.js app, worker, PostgreSQL, Redis, MinIO semuanya berjalan.
+4. ~~Implementasi Auth.js~~ — credentials + Google OAuth + RBAC middleware selesai (Tahap A6).
+
+Berikutnya (sesuai roadmap `EXECUTION-STEPS.md`):
+5. **Aktifkan CI/CD** — isi 4 secrets GitHub (`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY`) agar pipeline build→push→deploy berjalan otomatis (tersisa dari B6).
+6. **Fitur inti MVP (Tahap C)** — katalog kursus, integrasi Cloudflare Stream, upload materi MinIO, checkout Midtrans/Xendit, enrollment + progress tracking.
+7. **Tentukan pilihan final video hosting** — keputusan awal: Cloudflare Stream (PRD §6.3 Opsi A); finalisasi berdasarkan estimasi jam tonton bulanan saat Tahap C2.
+8. **Setup backup terjadwal & monitoring (Tahap D)** — skrip `backup.sh`/`restore.sh` sudah siap (A8); aktivasi cron harian + Uptime Kuma + Sentry wajib sebelum go-live publik penuh.
