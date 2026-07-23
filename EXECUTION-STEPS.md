@@ -419,8 +419,8 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 | # | Langkah | Output | Status |
 |---|---|---|---|
-| C1 | Katalog kursus + course builder (draft/publish) | CRUD kursus | 🔵 |
-| C2 | Integrasi Cloudflare Stream (interface `VideoProvider`) | Upload & play video | ⬜ |
+| C1 | Katalog kursus + course builder (draft/publish) | CRUD kursus | ✅ |
+| C2 | Integrasi Cloudflare Stream (interface `VideoProvider`) | Upload & play video | ✅ |
 | C3 | Upload materi ke MinIO (signed URL) | Unduh/upload materi | ⬜ |
 | C4 | Checkout Midtrans/Xendit + webhook idempotent | Transaksi sandbox sukses | ⬜ |
 | C5 | Enrollment otomatis + progress tracking | Progres siswa tercatat | ⬜ |
