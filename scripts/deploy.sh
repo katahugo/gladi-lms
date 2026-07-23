@@ -30,6 +30,12 @@ NEW_WORKER_IMAGE="$REGISTRY/$IMAGE_REPO/worker:$IMAGE_TAG"
 
 echo "==> [1/5] Sinkronisasi konfigurasi dari git"
 if [ -d .git ]; then
+  # Perbaiki permission git objects bila rusak oleh operasi root sebelumnya
+  # (gejala: "insufficient permission for adding an object to repository database")
+  if [ -w .git/objects ]; then :; else
+    echo "    Memperbaiki permission .git/objects..."
+    sudo chown -R "$(whoami):$(whoami)" .git/objects 2>/dev/null || true
+  fi
   git fetch origin main
   git reset --hard origin/main
 fi
