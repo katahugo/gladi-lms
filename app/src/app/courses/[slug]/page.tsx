@@ -1,9 +1,11 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
+import { auth } from "@/auth";
 import { db } from "@/db";
-import { courses, lessons, modules, users } from "@/db/schema";
+import { courses, enrollments, lessons, modules, users } from "@/db/schema";
 import { formatRupiah } from "@/lib/courses";
+import { CourseActionButton } from "@/components/course-action-button";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,20 @@ export default async function CourseDetailPage({
   const instructor = course.instructorId
     ? await db.query.users.findFirst({ where: eq(users.id, course.instructorId) })
     : null;
+
+  // Status enrollment pengunjung (untuk tombol aksi)
+  const session = await auth();
+  let isEnrolled = false;
+  if (session?.user) {
+    const enr = await db.query.enrollments.findFirst({
+      where: and(
+        eq(enrollments.userId, session.user.id),
+        eq(enrollments.courseId, course.id),
+        eq(enrollments.status, "active"),
+      ),
+    });
+    isEnrolled = Boolean(enr);
+  }
 
   const mods = await db
     .select()
@@ -55,12 +71,13 @@ export default async function CourseDetailPage({
           <span className="text-2xl font-bold text-emerald-400">
             {course.price === 0 ? "Gratis" : formatRupiah(course.price)}
           </span>
-          <button
-            type="button"
-            className="rounded-lg bg-emerald-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-emerald-500"
-          >
-            {course.price === 0 ? "Daftar Sekarang" : "Beli Kursus"}
-          </button>
+          <CourseActionButton
+            courseId={course.id}
+            slug={course.slug}
+            price={course.price}
+            isLoggedIn={Boolean(session?.user)}
+            isEnrolled={isEnrolled}
+          />
         </div>
         <p className="mt-2 text-xs text-zinc-500">
           Checkout & pembayaran tersedia pada Tahap C4.
