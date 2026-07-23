@@ -429,7 +429,7 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 | # | Langkah | Output | Status |
 |---|---|---|---|
-| D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | 🔵 |
+| D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | ✅ |
 | D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ⬜ |
 | D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | ⬜ |
 | D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ⬜ |
