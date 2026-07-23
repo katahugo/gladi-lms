@@ -30,7 +30,8 @@ ENV DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
 
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build \
-    && npm run build:worker
+    && npm run build:worker \
+    && npm run build:migrate
 
 # ---- Stage 3: base — runtime minimal bersama ----
 FROM node:20-alpine AS base
@@ -50,11 +51,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Migrasi dijalankan dari image ini oleh scripts/deploy.sh (step sebelum restart).
-# Skrip migrate.mjs memakai drizzle-orm (dependency produksi, ikut ter-bundle di
-# standalone) — bukan drizzle-kit (devDependency, tidak ada di image produksi).
+# migrate.mjs adalah BUNDLE ESM mandiri (esbuild, tanpa dependensi eksternal) —
+# tidak bergantung pada node_modules yang tidak disertakan di output standalone.
+COPY --from=builder --chown=nextjs:nodejs /app/dist/migrate.mjs ./migrate.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./migrate.mjs
 
 USER nextjs
 EXPOSE 3000

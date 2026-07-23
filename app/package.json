@@ -12,7 +12,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "build:worker": "esbuild src/worker/index.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/worker.js --external:next --external:react --external:react-dom",
-    "worker": "node dist/worker.js"
+    "worker": "node dist/worker.js",
+    "build:migrate": "esbuild scripts/migrate.mjs --bundle --platform=node --target=node20 --format=esm --outfile=dist/migrate.mjs --external:next --external:react --external:react-dom"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
