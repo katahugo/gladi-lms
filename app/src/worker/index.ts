@@ -1,14 +1,22 @@
 /**
- * Entry point worker BullMQ — placeholder untuk A7 (agar pipeline CI/CD
- * bisa membuild target `worker` di Dockerfile).
+ * Entry point worker BullMQ (D4).
  *
- * Implementasi job sesungguhnya (rekonsiliasi pembayaran, generate sertifikat,
- * kirim email) dibuat di langkah D4.
+ * Queue "lms" dengan 3 jenis job:
+ *   - "reconcile"      — rekonsiliasi pembayaran Midtrans (cron: tiap 15 menit)
+ *   - "certificate"    — generate sertifikat PDF + email (dipicu oleh endpoint
+ *                         /api/certificates via queue.add)
+ *   - "email"          — kirim email notifikasi (generic)
+ *
+ * Semua job bersifat idempoten dan bisa di-retry otomatis oleh BullMQ.
  */
+import { Queue, Worker } from "bullmq";
 import Redis from "ioredis";
 
-// Baca kredensial dari field terpisah (bukan URL) agar password dengan karakter
-// khusus tidak merusak parsing. Fallback ke REDIS_URL bila disediakan.
+import { reconcilePayments } from "@/jobs/reconcile";
+import { generateCertificatePdf } from "@/jobs/certificate";
+import { sendEmail, type EmailPayload } from "@/jobs/email";
+
+// Koneksi Redis
 const redisUrl = process.env.REDIS_URL;
 const host = process.env.REDIS_HOST;
 const port = process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379;
@@ -23,20 +31,70 @@ const connection = redisUrl
   ? new Redis(redisUrl, { maxRetriesPerRequest: null })
   : new Redis({ host, port, password, maxRetriesPerRequest: null });
 
+const queueName = "lms";
+
+// Queue untuk menambah job dari endpoint API (mis. sertifikat, email)
+export const queue = new Queue(queueName, { connection });
+
+// Worker yang memproses job dari queue
+const worker = new Worker(
+  queueName,
+  async (job) => {
+    const name = job.name;
+    const data = job.data as Record<string, unknown>;
+
+    switch (name) {
+      case "reconcile": {
+        const result = await reconcilePayments();
+        console.log(`[worker] reconcile selesai: cek ${result.checked}, update ${result.updated}`);
+        return result;
+      }
+      case "certificate": {
+        await generateCertificatePdf(data as unknown as Parameters<typeof generateCertificatePdf>[0]);
+        return { ok: true };
+      }
+      case "email": {
+        const sent = await sendEmail(data as EmailPayload);
+        return { sent };
+      }
+      default:
+        console.warn(`[worker] Job tidak dikenal: ${name}`, data);
+        return { skipped: true };
+    }
+  },
+  {
+    connection,
+    // Retry: 3x dengan backoff eksponensial (1dtk → 2dtk → 4dtk)
+    removeOnComplete: { age: 3600 }, // bersihkan job sukses setelah 1 jam
+    removeOnFail: { age: 86400 },    // simpan log gagal 24 jam
+  },
+);
+
+// Cron job: rekonsiliasi pembayaran tiap 15 menit
+
 async function main() {
   await connection.ping();
-  console.log("[worker] Terhubung ke Redis — menunggu job (queue dibuat di D4)...");
+  console.log("[worker] Terhubung ke Redis — memproses job queue 'lms'...");
 
-  // Keep-alive: worker tetap berjalan menunggu implementasi queue di D4
-  const keepAlive = setInterval(() => {
-    connection.ping().catch((err) => {
-      console.error("[worker] Redis ping gagal:", err.message);
-    });
-  }, 30_000);
+  // Jadwalkan rekonsiliasi berulang
+  await queue.add("reconcile", {}, {
+    repeat: { every: 15 * 60 * 1000 }, // 15 menit
+    jobId: "reconcile-repeat",
+    removeOnComplete: true,
+  });
+  console.log("[worker] Cron reconcile terpasang (tiap 15 menit)");
+
+  worker.on("completed", (job) => {
+    console.log(`[worker] ✓ ${job.name}#${job.id}`);
+  });
+  worker.on("failed", (job, err) => {
+    console.error(`[worker] ✗ ${job?.name ?? "?"}#${job?.id ?? "?"}:`, err.message);
+  });
 
   const shutdown = async (signal: string) => {
     console.log(`[worker] Menerima ${signal} — shutdown graceful...`);
-    clearInterval(keepAlive);
+    await worker.close();
+    await queue.close();
     await connection.quit();
     process.exit(0);
   };

@@ -10,8 +10,15 @@ import {
   lessons,
   modules,
   progress,
+  users,
 } from "@/db/schema";
 import { generateCertificateNumber } from "@/lib/quiz";
+
+// Import queue secara lazy (hanya di sisi server, tidak di edge)
+async function getQueue() {
+  const { queue } = await import("@/worker");
+  return queue;
+}
 
 /**
  * POST /api/certificates/issue — terbitkan sertifikat untuk siswa pada kursus.
@@ -99,11 +106,10 @@ export async function POST(req: Request) {
 
   await db.transaction(async (trx) => {
     await trx.insert(certificates).values({
-      userId: session.user.id,
+      userId: session.user!.id,
       courseId,
       certificateNumber,
     });
-    // Tandai enrollment completed
     if (enrollment.status !== "completed") {
       await trx
         .update(enrollments)
@@ -111,6 +117,28 @@ export async function POST(req: Request) {
         .where(eq(enrollments.id, enrollment.id));
     }
   });
+
+  // Trigger job worker untuk generate PDF + kirim email (async, non-blocking)
+  try {
+    const q = await getQueue();
+    const instructor = await db.query.users.findFirst({
+      where: eq(users.id, course!.instructorId),
+    });
+    await q.add("certificate", {
+      certificateNumber,
+      holderName: session.user!.name ?? "Peserta",
+      courseTitle: course!.title,
+      instructorName: instructor?.name ?? "Instruktur",
+      issuedDate: new Date().toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }),
+      userEmail: session.user!.email ?? "",
+    });
+  } catch (err) {
+    console.error("[certificates] Gagal queue job certificate:", err);
+  }
 
   return NextResponse.json({ certificateNumber, issuedAt: new Date() }, { status: 201 });
 }
