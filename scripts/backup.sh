@@ -20,7 +20,7 @@
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-$HOME/gladi-lms}"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 
 cd "$APP_DIR"

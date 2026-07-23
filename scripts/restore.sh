@@ -14,7 +14,7 @@
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-$HOME/gladi-lms}"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$APP_DIR"
 
 if [ -z "${POSTGRES_DB:-}" ] && [ -f .env ]; then

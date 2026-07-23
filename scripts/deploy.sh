@@ -13,7 +13,11 @@
 # =============================================================================
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-$HOME/gladi-lms}"
+# Tentukan APP_DIR dari lokasi skrip itu sendiri (bukan $HOME), sehingga skrip
+# tetap benar dijalankan sebagai user apa pun (deploy, root, atau CI via SSH).
+# APP_DIR bisa tetap di-override lewat environment bila perlu.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="${APP_DIR:-$(dirname "$SCRIPT_DIR")}"
 cd "$APP_DIR"
 
 IMAGE_TAG="${IMAGE_TAG:-latest}"
