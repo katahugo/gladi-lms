@@ -81,9 +81,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
-        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          # Tag waktu build dalam GMT+7 (WIB): YYYYMMDD-HHMMSS.
+          # TZ=GMT-7 adalah notasi POSIX untuk UTC+7 — deterministik di semua
+          # environment (tidak bergantung tzdata), setara Asia/Jakarta (WIB).
+          echo "wib_tag=$(TZ=GMT-7 date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+          echo "wib_human=$(TZ=GMT-7 date +'%Y-%m-%d %H:%M:%S') WIB" >> "$GITHUB_OUTPUT"
 
-      # Image app (target app) — :latest + :sha-xxx
+      # Image app (target app) — :latest + :sha-xxx + :YYYYMMDD-HHMMSS (WIB)
       - uses: docker/build-push-action@v6
         with:
           context: ./app
@@ -92,6 +98,10 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.wib_tag }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.meta.outputs.wib_human }}
+            id.gladi.build-time-wib=${{ steps.meta.outputs.wib_human }}
           build-args: |
             BUILD_SHA=${{ github.sha }}
           cache-from: type=gha,scope=app
@@ -106,6 +116,10 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:${{ steps.meta.outputs.wib_tag }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.meta.outputs.wib_human }}
+            id.gladi.build-time-wib=${{ steps.meta.outputs.wib_human }}
           build-args: |
             BUILD_SHA=${{ github.sha }}
           cache-from: type=gha,scope=worker
