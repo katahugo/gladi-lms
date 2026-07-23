@@ -124,6 +124,11 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd ~/gladi-lms
+            # Pastikan repo ada di ~/gladi-lms; clone jika belum ada (deploy pertama)
+            if [ ! -d "$HOME/gladi-lms/.git" ]; then
+              echo "Repo belum ada di \$HOME/gladi-lms — clone dulu"
+              git clone "https://github.com/${{ github.repository }}.git" "$HOME/gladi-lms"
+            fi
+            cd "$HOME/gladi-lms"
             export IMAGE_TAG="${{ needs.docker.outputs.image_tag }}"
             ./scripts/deploy.sh
