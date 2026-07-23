@@ -16,15 +16,12 @@ untuk pengujian lokal.
 
 | Status | Jumlah | Kasus |
 |---|---|---|
-| ✅ Lolos | 7 | 0.1, 1.1, 1.4, 4.5, 4.6, 6 (4 dari 5 sub-kasus API) |
-| ⏸ Terblokir | sisanya | Semua kasus yang butuh login (0.2, 0.3, 1.2, 1.3, 1.5, Bagian 2–5) |
+| ✅ Lolos | 11 | 0.1, 1.1, 1.2, 1.3, 1.4, 1.5, 4.5, 4.6, 6 (4 dari 5 sub-kasus API) |
+| ⏸ Perlu uji manual browser | sisanya | 0.2 (promosi sudah ✓), 0.3, Bagian 2–5 (form interaktif server action) |
 
-**Pemblokir:** endpoint `/api/auth/*` mengembalikan **500** di produksi setelah
-deploy C1, sehingga login tidak bisa dilakukan. Bukan bug fitur C1 — masalah
-konfigurasi Auth.js di deployment. **Tindakan yang dibutuhkan (di VPS):**
-`docker compose logs --tail=60 app | grep -iE "error|auth|secret"` untuk diagnosis.
-Selain itu, promosi role instruktur (0.2) butuh `UPDATE users SET role='instructor'`
-via DB di VPS (SSH dari lingkungan uji saya ditolak publickey).
+**Pemblokir TERATASI (23 Jul 2026):** Auth 500 `UntrustedHost` → diperbaiki `trustHost: true` di `auth.ts` (deploy run #24 sukses). Login siswa & instruktur kini berfungsi normal.
+
+**Catatan metode:** kasus yang memakai form interaktif (Bagian 2–5) perlu diuji manual via browser — server action Next.js tidak bisa dipanggil via curl. Yang sudah divalidasi otomatis oleh saya: registrasi API, RBAC (anonim/siswa/instruktur), katalog publik, 404, form builder ter-render, helper slugify/formatRupiah, duplikat email 409.
 
 ---
 
@@ -78,12 +75,12 @@ wewenang admin, dilakukan via DB sampai dashboard admin ada di Tahap E3).
 | # | Kasus Uji | Langkah | Hasil yang Diharapkan | Status |
 |---|---|---|---|---|
 | 1.1 | Anonim buka builder | Logout, buka `/instructor/courses` | Redirect 307 ke `/login?callbackUrl=/instructor/courses` | [x] |
-| 1.2 | Siswa buka builder | Login sebagai siswa, buka `/instructor/courses` | Redirect ke `/` (bukan halaman builder) | [ ] ⏸ |
-| 1.3 | Instruktur buka builder | Login sebagai instruktur, buka `/instructor/courses` | Halaman "Kursus Saya" tampil | [ ] ⏸ |
+| 1.2 | Siswa buka builder | Login sebagai siswa, buka `/instructor/courses` | Redirect ke `/` (bukan halaman builder) | [x] |
+| 1.3 | Instruktur buka builder | Login sebagai instruktur, buka `/instructor/courses` | Halaman "Kursus Saya" tampil | [x] |
 | 1.4 | Anonim buka katalog | Logout, buka `/courses` | Halaman katalog tampil (publik, tanpa login) | [x] |
-| 1.5 | Siswa buka katalog | Login siswa, buka `/courses` | Halaman katalog tampil | [ ] ⏸ |
+| 1.5 | Siswa buka katalog | Login siswa, buka `/courses` | Halaman katalog tampil | [x] |
 
-> **⚠ PEMBLOKIR (23 Jul 2026):** Kasus yang membutuhkan login (1.2, 1.3, 1.5, dan seluruh Bagian 2–5) **terblokir sementara** — endpoint `/api/auth/*` mengembalikan **500 "problem with server configuration"** di produksi setelah deploy C1, sehingga login tidak bisa dilakukan. Halaman `/login` (UI) dan registrasi/DB masih berfungsi normal. Ini bukan bug fitur C1 melainkan masalah konfigurasi Auth.js di deployment. Sedang didiagnosis — butuh `docker compose logs app` dari VPS untuk memastikan penyebab.
+> **✅ PEMBLOKIR TERATASI (23 Jul 2026):** Auth 500 `UntrustedHost` diperbaiki dengan `trustHost: true` di `auth.ts` (deploy run #24). Login siswa & instruktur kini berfungsi; 1.2, 1.3, 1.5 lolos. Catatan: kasus yang memakai **form interaktif server action** (Bagian 2–5) paling andal diuji manual via browser — server action Next.js memerlukan token internal yang tidak bisa direplikasi via curl. Yang sudah tervalidasi otomatis: form builder ter-render (200), helper `slugify` (`belajar-nextjs-react-lengkap`) & `formatRupiah` (`Rp150.000`) benar, RBAC & guard akses bekerja.
 
 ---
 
