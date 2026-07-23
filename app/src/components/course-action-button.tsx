@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { CouponInput } from "@/components/coupon-input";
+import { formatRupiah } from "@/lib/courses";
+
 /**
- * Tombol aksi di halaman detail kursus (C4/C5):
+ * Tombol aksi di halaman detail kursus (C4/C5/E4):
  *   - sudah enrollment  → "Lanjut Belajar" ke /learn/[slug]
  *   - gratis            → "Daftar Gratis" (enrollment langsung)
- *   - berbayar          → "Beli Kursus" → checkout Midtrans → redirect paymentUrl
+ *   - berbayar          → "Beli Kursus" → (opsional kupon) → checkout Midtrans
  */
 export function CourseActionButton({
   courseId,
@@ -25,6 +28,11 @@ export function CourseActionButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coupon, setCoupon] = useState<{ code: string | null; finalPrice: number; discountAmount: number }>({
+    code: null,
+    finalPrice: price,
+    discountAmount: 0,
+  });
 
   if (isEnrolled) {
     return (
@@ -48,7 +56,7 @@ export function CourseActionButton({
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId }),
+        body: JSON.stringify({ courseId, couponCode: coupon.code ?? undefined }),
       });
       const json = (await res.json()) as {
         free?: boolean;
@@ -75,7 +83,20 @@ export function CourseActionButton({
   }
 
   return (
-    <div>
+    <div className="space-y-3">
+      {price > 0 && (
+        <CouponInput
+          courseId={courseId}
+          originalPrice={price}
+          onApplied={setCoupon}
+        />
+      )}
+      {coupon.discountAmount > 0 && (
+        <div className="flex items-baseline gap-2 text-sm">
+          <span className="text-zinc-500 line-through">{formatRupiah(price)}</span>
+          <span className="text-lg font-bold text-emerald-400">{formatRupiah(coupon.finalPrice)}</span>
+        </div>
+      )}
       <button
         onClick={handleCheckout}
         disabled={busy}
@@ -83,7 +104,7 @@ export function CourseActionButton({
       >
         {busy ? "Memproses..." : price === 0 ? "Daftar Gratis" : "Beli Kursus"}
       </button>
-      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }

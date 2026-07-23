@@ -3,9 +3,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { courses, enrollments, lessons, modules, progress } from "@/db/schema";
+import { certificates, courses, enrollments, lessons, modules, progress } from "@/db/schema";
 import { VideoPlayer } from "@/components/video-player";
 import { MarkCompleteButton } from "@/components/mark-complete";
+import { QuizPanel } from "@/components/quiz-panel";
+import { IssueCertificateButton } from "@/components/issue-certificate";
+import { DiscussionPanel } from "@/components/discussion-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -29,14 +32,24 @@ export default async function LearnPage({
   const course = await db.query.courses.findFirst({ where: eq(courses.slug, slug) });
   if (!course) notFound();
 
+  // Enrollment aktif ATAU completed (agar setelah lulus tetap bisa akses konten)
   const enrollment = await db.query.enrollments.findFirst({
     where: and(
       eq(enrollments.userId, session.user.id),
       eq(enrollments.courseId, course.id),
-      eq(enrollments.status, "active"),
     ),
   });
-  if (!enrollment) redirect(`/courses/${slug}`);
+  if (!enrollment || (enrollment.status !== "active" && enrollment.status !== "completed")) {
+    redirect(`/courses/${slug}`);
+  }
+
+  // Sertifikat yang sudah terbit (untuk tombol/tampilan)
+  const existingCert = await db.query.certificates.findFirst({
+    where: and(
+      eq(certificates.userId, session.user.id),
+      eq(certificates.courseId, course.id),
+    ),
+  });
 
   const mods = await db
     .select()
@@ -95,11 +108,28 @@ export default async function LearnPage({
                 <div className="prose prose-invert max-w-none rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-300">
                   {activeLesson.contentBody}
                 </div>
+              ) : activeLesson.type === "quiz" ? (
+                <QuizPanel lessonId={activeLesson.id} />
               ) : (
                 <div className="flex aspect-video items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-500">
                   Konten belum tersedia untuk materi ini.
                 </div>
               )}
+
+              {/* Tombol sertifikat: tampil bila semua materi sudah selesai */}
+              {totalLessons > 0 && completedLessons === totalLessons && (
+                <div className="mt-6">
+                  <IssueCertificateButton
+                    courseId={course.id}
+                    existingNumber={existingCert?.certificateNumber ?? null}
+                  />
+                </div>
+              )}
+
+              {/* Diskusi per-lesson */}
+              <div className="mt-8 border-t border-zinc-800 pt-6">
+                <DiscussionPanel lessonId={activeLesson.id} />
+              </div>
             </div>
           ) : (
             <div className="flex aspect-video items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-500">

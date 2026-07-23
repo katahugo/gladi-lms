@@ -54,6 +54,8 @@ export const attemptStatus = pgEnum("attempt_status", [
   "graded",
 ]);
 
+export const discountType = pgEnum("discount_type", ["percent", "fixed"]);
+
 // =============================================================================
 // AUTH.JS TABLES (NextAuth v5 + Drizzle adapter)
 // =============================================================================
@@ -357,6 +359,31 @@ export const transactions = pgTable(
 // ditegakkan via partial unique index SQL mentah di migrasi:
 //   CREATE UNIQUE INDEX ... ON transactions(user_id, course_id) WHERE status = 'paid'
 // karena Drizzle belum mendukung partial unique index secara deklaratif.
+
+// =============================================================================
+// KUPON / DISKON (E4)
+// =============================================================================
+
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Kode yang diketik siswa saat checkout, mis. "PROMO50"
+    code: text("code").notNull().unique(),
+    discountType: discountType("discount_type").notNull(),
+    // percent: 1–100 | fixed: nominal Rupiah
+    value: integer("value").notNull(),
+    // Batas pemakaian total (null = tak terbatas)
+    maxUses: integer("max_uses"),
+    usedCount: integer("used_count").notNull().default(0),
+    // Hanya berlaku untuk kursus tertentu (null = semua kursus)
+    courseId: uuid("course_id").references(() => courses.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { mode: "date" }),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("coupons_code_idx").on(t.code)],
+);
 
 // =============================================================================
 // FORUM DISKUSI & RATING

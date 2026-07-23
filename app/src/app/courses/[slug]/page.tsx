@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { courses, enrollments, lessons, modules, users } from "@/db/schema";
 import { formatRupiah } from "@/lib/courses";
 import { CourseActionButton } from "@/components/course-action-button";
+import { RatingPanel } from "@/components/rating-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -79,9 +80,6 @@ export default async function CourseDetailPage({
             isEnrolled={isEnrolled}
           />
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Checkout & pembayaran tersedia pada Tahap C4.
-        </p>
       </div>
 
       <section className="mt-10">
@@ -117,6 +115,11 @@ export default async function CourseDetailPage({
             })}
           </ol>
         )}
+      </section>
+
+      <section className="mt-10 border-t border-zinc-800 pt-8">
+        <h2 className="mb-4 text-xl font-semibold text-white">Rating & Ulasan</h2>
+        <RatingPanel courseId={course.id} canReview={isEnrolled} />
       </section>
     </div>
   );

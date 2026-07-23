@@ -15,6 +15,13 @@
       "when": 1784735042032,
       "tag": "0001_custom_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784805413101,
+      "tag": "0002_coupons",
+      "breakpoints": true
     }
   ]
 }

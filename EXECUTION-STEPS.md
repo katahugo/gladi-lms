@@ -439,12 +439,12 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 | # | Langkah | Status |
 |---|---|---|
-| E1 | Kuis & auto-grading + sertifikat + verifikasi publik | ⬜ |
-| E2 | Forum diskusi & rating | ⬜ |
-| E3 | Dashboard admin/instruktur + laporan | ⬜ |
-| E4 | Kupon, landing page, WhatsApp | ⬜ |
+| E1 | Kuis & auto-grading + sertifikat + verifikasi publik | ✅ |
+| E2 | Forum diskusi & rating | ✅ |
+| E3 | Dashboard admin/instruktur + laporan | ✅ |
+| E4 | Kupon, landing page, WhatsApp | ✅ |
 
 ---
 
-**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → ~~C1–C5~~ ✅ → **D1–D5 berikutnya** → E1+.
-Tahap C selesai — fitur inti MVP lengkap: katalog, video (Cloudflare Stream), materi (MinIO), checkout (Midtrans) + webhook idempotent, enrollment otomatis + progress tracking + halaman belajar. Perintah cukup sebutkan kodenya, misal: "kerjakan D1".
+**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → ~~C1–C5~~ ✅ → ~~E1–E4~~ ✅ → **D1–D5 berikutnya** (keandalan — wajib sebelum go-live publik penuh).
+Fitur lengkap sesuai PRD §3: auth, katalog, video, materi, checkout, kuis, sertifikat+verifikasi, forum+rating, dashboard admin/instruktur, kupon, landing page, WhatsApp. Perintah cukup sebutkan kodenya, misal: "kerjakan D1".
