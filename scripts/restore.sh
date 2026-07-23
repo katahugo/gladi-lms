@@ -52,11 +52,27 @@ SIZE_BYTES="$(stat -c%s "$LOCAL_PATH")"
 echo "    Download OK (${SIZE_BYTES} bytes)"
 
 echo "==> [2/4] Salin ke container & recreate database"
+echo ""
+echo "    ⚠  PERINGATAN: operasi ini akan MENGHAPUS database '${POSTGRES_DB}'"
+echo "    ⚠  dan menggantinya dengan backup '${BACKUP_NAME}'."
+echo "    ⚠  Container app & worker akan di-restart setelahnya."
+echo ""
+
+# Konfirmasi eksplisit — wajib, mencegah restore tidak sengaja
+if [ "${SKIP_CONFIRM:-}" != "yes" ]; then
+  read -r -p "    Lanjutkan? Ketik 'YA' (huruf besar): " confirm
+  if [ "$confirm" != "YA" ]; then
+    echo "    Restore dibatalkan."
+    rm -f "$LOCAL_PATH"
+    exit 0
+  fi
+fi
+
 docker cp "$LOCAL_PATH" "lms_postgres:/tmp/${BACKUP_NAME}"
 
-# Putus koneksi aktif ke database, lalu drop + create ulang (restore bersih)
+# Putus koneksi aktif, lalu drop + create ulang
 docker exec lms_postgres psql -U "$POSTGRES_USER" -d postgres -c \
-  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${POSTGRES_DB}' AND pid <> pg_backend_pid();" >/dev/null
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${POSTGRES_DB}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true
 docker exec lms_postgres psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS ${POSTGRES_DB};"
 docker exec lms_postgres psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE ${POSTGRES_DB};"
 
@@ -68,15 +84,42 @@ docker exec lms_postgres pg_restore \
   --no-privileges \
   "/tmp/${BACKUP_NAME}"
 
-echo "==> [4/4] Verifikasi cepat"
+echo "==> [4/4] Verifikasi & restart aplikasi"
 TABLES="$(docker exec lms_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -c \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" | tr -d ' \n')"
 echo "    Jumlah tabel di public schema: ${TABLES}"
 [ "$TABLES" -ge 10 ] || { echo "==> PERINGATAN: tabel terlalu sedikit — cek manual!" >&2; exit 1; }
 
+# Setelah restore, jalankan migrasi untuk memastikan skema up-to-date
+echo ""
+echo "==> Menjalankan migrasi (memastikan skema DB sesuai kode terbaru)..."
+NETWORK_NAME="$(docker inspect lms_postgres --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null || true)"
+if [ -n "$NETWORK_NAME" ]; then
+  docker run --rm \
+    --network "$NETWORK_NAME" \
+    -e PGHOST=postgres -e PGPORT=5432 \
+    -e PGDATABASE="${POSTGRES_DB}" \
+    -e PGUSER="${POSTGRES_USER}" \
+    -e PGPASSWORD="${POSTGRES_PASSWORD}" \
+    "$(docker inspect --format='{{.Config.Image}}' lms_app 2>/dev/null || echo 'ghcr.io/katahugo/gladi-lms/app:latest')" \
+    node migrate.mjs && echo "    Migrasi selesai." || echo "    PERINGATAN: migrasi gagal — jalankan manual deploy.sh"
+fi
+
+# Restart app + worker agar koneksi ke DB yang baru diperbarui
+echo ""
+echo "==> Restart aplikasi..."
+docker compose restart app worker
+sleep 5
+if curl -fsS http://localhost/api/health >/dev/null 2>&1; then
+  echo "    Aplikasi sehat setelah restore."
+else
+  echo "    PERINGATAN: health check gagal — cek 'docker compose logs app'"
+fi
+
 # Bersihkan file sementara
 rm -f "$LOCAL_PATH"
 docker exec lms_postgres rm -f "/tmp/${BACKUP_NAME}"
 
-echo "==> Restore SELESAI — ${TABLES} tabel pulih. Jalankan migrasi (deploy.sh)"
-echo "    jika backup lebih tua dari skema aplikasi saat ini."
+echo ""
+echo "==> Restore SELESAI — ${TABLES} tabel pulih. Data dari backup ${BACKUP_NAME}."
+echo "    Aplikasi sudah di-restart dengan koneksi ke database yang baru."

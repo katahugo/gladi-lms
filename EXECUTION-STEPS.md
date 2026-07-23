@@ -430,7 +430,7 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 | # | Langkah | Output | Status |
 |---|---|---|---|
 | D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | ✅ |
-| D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ⬜ |
+| D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | 🔵 |
 | D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | ⬜ |
 | D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ⬜ |
 | D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | ⬜ |
@@ -514,6 +514,64 @@ tail -20 /var/log/lms-backup.log
 - [ ] Backup pertama sukses
 - [ ] Cron terpasang (`crontab -l | grep gladi-lms-backup` menampilkan 1 baris)
 - [ ] Snapshot VM pertama tersimpan di portal
+
+---
+
+### D2 — Uji Restore & Dokumentasi SOP
+
+Uji restore membuktikan backup bisa dipulihkan — backup yang tidak pernah dites restore-nya tidak bisa diandalkan (PRD §8.2).
+
+**PENTING:** restore bersifat **destruktif** — menghapus database yang sedang berjalan dan menggantinya dengan backup. Lakukan di jam sepi (malam/pagi). Aplikasi akan restart otomatis setelah restore selesai.
+
+**Langkah uji restore di VPS (SSH sebagai `deploy`):**
+
+```bash
+cd ~/gladi-lms
+git fetch origin main && git reset --hard origin/main
+
+# Restore dari backup terbaru:
+./scripts/restore.sh
+```
+
+Skrip akan:
+1. Mencari backup terbaru di Azure Blob
+2. Menampilkan nama backup dan meminta konfirmasi `YA`
+3. Download backup → drop database → recreate → `pg_restore`
+4. Verifikasi jumlah tabel (minimal 10)
+5. Jalankan migrasi untuk memastikan skema up-to-date
+6. Restart app + worker + health check
+
+**Verifikasi setelah restore:**
+```bash
+# Cek aplikasi hidup
+curl -s http://localhost/api/health
+
+# Login masih berfungsi? (data user dari backup terpulihkan)
+curl -s -c /tmp/ck.txt https://gladi.id/api/auth/csrf | grep csrfToken
+
+# Cek jumlah user di database (harus sama seperti sebelum restore):
+set -a; source .env; set +a
+docker exec lms_postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} \
+  -c "SELECT count(*) AS total_users FROM users;"
+```
+
+**SOP Restore (simpan di tempat terpisah / catat):**
+
+| Skenario | Tindakan |
+|---|---|
+| **Database korup / tidak sengaja terhapus** | `./scripts/restore.sh` — pilih backup terbaru |
+| **Restore ke titik waktu tertentu** | `./scripts/restore.sh pgdump-gladi_lms-20260722T020000Z.dump` |
+| **Restore gagal (tabel < 10)** | Cek backup lain: list blob di Azure Portal (container `lms-backups`) → pilih file lain yang ukurannya wajar (> 10KB) |
+| **Setelah restore, login gagal** | `AUTH_SECRET` mungkin berubah — pastikan `.env` tidak ikut ter-overwrite |
+| **Aplikasi tidak bisa konek DB** | `docker compose logs app` — kemungkinan `pg_hba.conf` atau password berubah |
+
+> **Catatan keandalan:** Uji restore sebaiknya dilakukan **berkala** (mis. sebulan sekali) untuk memastikan prosedur tetap berfungsi seiring perubahan skema database. Backup yang tidak pernah dites restore-nya tidak bisa diandalkan.
+
+- [ ] Restore dari backup terbaru berhasil
+- [ ] Jumlah tabel ≥ 10
+- [ ] Aplikasi sehat setelah restore (`/api/health` OK)
+- [ ] Login masih berfungsi
+- [ ] SOP restore dicatat/didokumentasikan
 
 ---
 
