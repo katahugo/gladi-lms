@@ -431,7 +431,7 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 |---|---|---|---|
 | D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | ✅ |
 | D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ✅ |
-| D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | ⬜ |
+| D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | 🔵 |
 | D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ⬜ |
 | D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | ⬜ |
 
@@ -572,6 +572,84 @@ docker exec lms_postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} \
 - [ ] Aplikasi sehat setelah restore (`/api/health` OK)
 - [ ] Login masih berfungsi
 - [ ] SOP restore dicatat/didokumentasikan
+
+---
+
+### D3 — Uptime Kuma + Sentry + Azure Monitor Alert
+
+D3 mengaktifkan 3 lapis monitoring:
+1. **Uptime Kuma** (self-hosted) — cek aplikasi hidup/mati tiap menit, notifikasi via Telegram
+2. **Sentry** (cloud free tier) — tracking error aplikasi (exception, crash)
+3. **Azure Monitor** — alert resource VM (CPU > 85%, RAM > 85%, disk > 80%)
+
+---
+
+**1. Uptime Kuma (sudah ada di compose — tinggal dikonfigurasi via browser)**
+
+Uptime Kuma sudah berjalan di container `lms_uptime_kuma`, UI di `http://localhost:3001` (hanya bisa diakses via SSH tunnel karena hanya bind 127.0.0.1).
+
+Akses Uptime Kuma:
+```bash
+# Di laptop Anda (PowerShell), buat SSH tunnel:
+ssh -L 3001:localhost:3001 -p 2020 deploy@70.153.16.78
+
+# Buka browser → http://localhost:3001
+# Setup akun admin (pertama kali)
+```
+
+Tambahkan 2 monitor:
+1. **Aplikasi web:**
+   - Monitor type: **HTTP(s)**
+   - URL: `https://gladi.id/api/health`
+   - Heartbeat interval: 60 detik
+   - Resend notification: 3 kali gagal berturut-turut
+2. **Database:**
+   - Monitor type: **HTTP(s)**
+   - URL: `https://gladi.id/api/health/db`
+   - Heartbeat interval: 120 detik
+
+Setup notifikasi (opsional): Settings → Notifications → Telegram bot token + chat ID.
+
+---
+
+**2. Sentry — error tracking**
+
+Sentry SDK sudah terpasang di kode (`instrumentation.ts` + `next.config.ts`). Hanya perlu DSN:
+
+1. Buka `https://sentry.io` → sign up (free tier: 5K events/bulan, cukup untuk LMS kecil-menengah).
+2. Create project → platform **Next.js** → salin **DSN** (format: `https://xxx@sentry.io/xxx`).
+3. Di VPS, tambahkan ke `.env`:
+   ```bash
+   cd ~/gladi-lms
+   echo 'SENTRY_DSN=https://xxx@sentry.io/xxx' >> .env
+   docker compose restart app
+   ```
+4. Uji: kunjungi halaman yang tidak ada (`https://gladi.id/xxx`) → cek dashboard Sentry, error 404 (atau exception) akan muncul dalam beberapa detik.
+
+**Konfigurasi di kode:**
+- `tracesSampleRate`: 0.1 (10% sampel) di production — hemat kuota free tier
+- Tanpa `SENTRY_DSN`, sentry tetap terinisialisasi tapi no-op (tidak mengirim apa pun)
+
+---
+
+**3. Azure Monitor Alert (CPU/RAM/disk)**
+
+Buka portal Azure → VM `vm-gladi-lms` → **Alerts** → **Create alert rule**:
+
+| Alert | Sinyal | Threshold | Evaluasi |
+|---|---|---|---|
+| CPU tinggi | Percentage CPU | > 85% (rata-rata 5 menit) | Cek tiap 5 menit |
+| RAM tinggi | Available Memory Bytes | < 512 MB | Cek tiap 5 menit |
+| Disk penuh | Used Space Percentage | > 80% (OS disk) | Cek tiap 15 menit |
+
+Action group: buat baru → notifikasi email ke `hugoirwanto@gmail.com` (atau email Anda).
+
+---
+
+**Verifikasi monitoring aktif:**
+- [ ] Uptime Kuma: monitor aplikasi + DB aktif, status hijau
+- [ ] Sentry: DSN terisi di `.env`, error muncul di dashboard
+- [ ] Azure Monitor: 3 alert rule terbuat
 
 ---
 
