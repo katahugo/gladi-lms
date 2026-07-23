@@ -7,14 +7,21 @@
  */
 import Redis from "ioredis";
 
+// Baca kredensial dari field terpisah (bukan URL) agar password dengan karakter
+// khusus tidak merusak parsing. Fallback ke REDIS_URL bila disediakan.
 const redisUrl = process.env.REDIS_URL;
+const host = process.env.REDIS_HOST;
+const port = process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379;
+const password = process.env.REDIS_PASSWORD;
 
-if (!redisUrl) {
-  console.error("REDIS_URL belum diset — worker berhenti");
+if (!redisUrl && !host) {
+  console.error("REDIS_HOST (atau REDIS_URL) belum diset — worker berhenti");
   process.exit(1);
 }
 
-const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
+const connection = redisUrl
+  ? new Redis(redisUrl, { maxRetriesPerRequest: null })
+  : new Redis({ host, port, password, maxRetriesPerRequest: null });
 
 async function main() {
   await connection.ping();
