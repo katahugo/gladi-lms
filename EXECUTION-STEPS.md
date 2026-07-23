@@ -597,6 +597,8 @@ ssh -L 3001:localhost:3001 -p 2020 deploy@70.153.16.78
 # Setup akun admin (pertama kali)
 ```
 
+**Update: Uptime Kuma kini bisa diakses langsung via browser** di `https://monitoring.gladi.id` (tanpa SSH tunnel). Lihat langkah provisioning SSL monitoring di bawah.
+
 Tambahkan 2 monitor:
 1. **Aplikasi web:**
    - Monitor type: **HTTP(s)**
@@ -648,10 +650,35 @@ Action group: buat baru → notifikasi email ke `hugoirwanto@gmail.com` (atau em
 
 **Verifikasi monitoring aktif:**
 - [ ] Uptime Kuma: monitor aplikasi + DB aktif, status hijau
+- [ ] Uptime Kuma: bisa diakses via `https://monitoring.gladi.id`
 - [ ] Sentry: DSN terisi di `.env`, error muncul di dashboard
 - [ ] Azure Monitor: 3 alert rule terbuat
 
 ---
+
+### Provisioning SSL untuk Monitoring (sekali jalan)
+
+Setelah DNS `monitoring.gladi.id` sudah dibuat (A record → `70.153.16.78`, Cloudflare proxied ON), jalankan di VPS:
+
+```bash
+cd ~/gladi-lms
+git fetch origin main && git reset --hard origin main
+
+# Jalankan provisioning SSL untuk monitoring
+./scripts/provision-monitoring-ssl.sh hugoirwanto@gmail.com
+```
+
+Skrip akan:
+1. Menerbitkan sertifikat Let's Encrypt untuk `monitoring.gladi.id`
+2. Reload Nginx dengan blok server monitoring
+3. Verifikasi akses `https://monitoring.gladi.id`
+
+Setelah itu, buka `https://monitoring.gladi.id` di browser — Uptime Kuma akan menampilkan halaman setup akun admin (pertama kali). Isi username/email + password untuk membuat akun, lalu tambahkan 2 monitor seperti panduan di atas.
+
+**Keamanan Uptime Kuma:**
+- **Autentikasi bawaan** — Uptime Kuma punya sistem login sendiri (username + password). Tidak perlu mekanisme tambahan.
+- Akses port 3001 sudah dihapus dari host (tidak bisa diakses via `http://VPS_IP:3001`), hanya via Nginx reverse proxy + SSL.
+- Status page publik Uptime Kuma bisa diaktifkan dari Settings bila ingin menampilkan status tanpa login.
 
 | # | Langkah | Status |
 |---|---|---|

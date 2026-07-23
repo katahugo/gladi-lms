@@ -289,9 +289,8 @@ services:
     container_name: lms_uptime_kuma
     volumes:
       - uptimekumadata:/app/data
-    ports:
-      # Hanya via SSH tunnel: ssh -L 3001:localhost:3001
-      - "127.0.0.1:3001:3001"
+    # Tidak lagi mengekspos port ke host — akses via Nginx reverse proxy
+    # di monitoring.gladi.id (lihat nginx/templates/lms.conf.template)
     networks:
       - lms_net
     mem_limit: 256m
