@@ -2,7 +2,7 @@
 
 > Dokumen ini merangkum seluruh konteks, keputusan, dan progress proyek agar
 > percakapan/pengerjaan bisa dilanjutkan tanpa kehilangan informasi.
-> **Terakhir diperbarui:** 23 Juli 2026 (setelah C1–C5 selesai, E1 dimulai).
+> **Terakhir diperbarui:** 23 Juli 2026 (setelah E1–E4 selesai).
 
 ---
 
@@ -58,22 +58,20 @@ Go-live 23 Jul 2026. 15 pelajaran terdokumentasi (health 404, nginx crash, certb
 - **C4** Checkout Midtrans + webhook idempotent (kursus gratis langsung enrollment, signature verification, enrollment atomik)
 - **C5** Enrollment otomatis + progress tracking + halaman belajar (`/learn/[slug]`)
 
-### 🔵 Tahap E (E1–E4) — Fitur lanjutan — SEDANG DIKERJAKAN
-- **E1** Kuis & auto-grading + sertifikat + verifikasi publik — **BARU DIMULAI**
-  - Sudah dibuat: `app/src/lib/quiz.ts` (gradeAnswers untuk MC/true-false, essay manual, generateCertificateNumber GLD-YYYY-XXXXXX)
-  - **Belum:** endpoint API kuis (submit attempt + auto-grading), endpoint sertifikat (issue saat kursus selesai), halaman verifikasi publik `/verify/[certificateNumber]`, UI kuis di halaman belajar
-- **E2** Forum diskusi & rating — belum
-- **E3** Dashboard admin/instruktur + laporan — belum
-- **E4** Kupon, landing page, WhatsApp — belum
+### ✅ Tahap E (E1–E4) — Fitur lanjutan
+- **E1** Kuis & auto-grading (MC/true-false otomatis, essay manual) + sertifikat otomatis saat kursus selesai + verifikasi publik `/verify/[number]`. Endpoint: `/api/quizzes/[lessonId]`(+`/submit`), `/api/instructor/quizzes/[lessonId]`, `/api/certificates`, `/api/verify/[number]`. UI: `QuizPanel`, `IssueCertificateButton`, `/dashboard/certificates`, `/verify`.
+- **E2** Forum diskusi per-lesson (thread + balasan 1 level, resolved, moderasi hapus) + rating & review kursus (upsert per user+course, rata-rata). Endpoint: `/api/discussions`(+/`[id]`), `/api/reviews`. UI: `DiscussionPanel` (di `/learn`), `RatingPanel` (di `/courses/[slug]`).
+- **E3** Dashboard admin (stats global, manajemen user + ubah role, daftar transaksi) + dashboard instruktur (stats kursus miliknya, progres siswa per kursus). Helper: `lib/reports.ts` (getInstructorStats/getAdminStats). Halaman: `/admin`, `/admin/users`, `/admin/transactions`, `/admin/coupons`, `/instructor/dashboard`, `/instructor/courses/[id]/students`.
+- **E4** Kupon diskon (tabel `coupons` migrasi `0002_coupons.sql`, tipe percent/fixed, maxUses, kedaluwarsa, per-kursus, integrasi checkout harga final + diskon 100% langsung enrollment) + landing page promosi baru (`/`) + tombol WhatsApp mengambang (`WhatsAppFloat`, env `NEXT_PUBLIC_WA_NUMBER`). Endpoint: `/api/coupons/validate`, `/api/admin/coupons`(+/`[id]`). UI: `CouponInput` di tombol aksi kursus, `/admin/coupons`.
 
-### ⬜ Tahap D (D1–D5) — Keandalan (ditunda, dikerjakan setelah E atas permintaan user)
+### ⬜ Tahap D (D1–D5) — Keandalan (berikutnya, wajib sebelum go-live publik penuh)
 Backup cron, uji restore, Uptime Kuma + Sentry, job BullMQ, load test.
 
-## 5. Skema Database (16 tabel)
+## 5. Skema Database (17 tabel)
 
-users, accounts, sessions, verification_tokens (Auth.js) · courses, modules, lessons · enrollments, progress · quizzes, quiz_questions, quiz_attempts · certificates · transactions · discussions, course_reviews.
+users, accounts, sessions, verification_tokens (Auth.js) · courses, modules, lessons · enrollments, progress · quizzes, quiz_questions, quiz_attempts · certificates · transactions · **coupons** · discussions, course_reviews.
 Constraint penting: `transactions_paid_unique` (partial unique — idempotensi), CHECK rating 1–5, progress 0–100.
-Migrasi: `app/drizzle/0000_init.sql` + `0001_custom_constraints.sql` via `app/scripts/migrate.mjs` (bundle ESM).
+Migrasi: `app/drizzle/0000_init.sql` + `0001_custom_constraints.sql` + `0002_coupons.sql` via `app/scripts/migrate.mjs` (bundle ESM, dijalankan otomatis oleh deploy.sh).
 
 ## 6. Pola Teknik Penting (jangan dilanggar)
 
@@ -106,10 +104,9 @@ Migrasi: `app/drizzle/0000_init.sql` + `0001_custom_constraints.sql` via `app/sc
 
 ## 9. Keadaan Terkini & Langkah Berikutnya
 
-- Pipeline CI/CD hijau; setiap push ke `main` auto-deploy dengan tag timestamp WIB.
-- Tahap C lengkap dan tervalidasi live.
-- **Sedang mengerjakan E1** — `lib/quiz.ts` sudah dibuat; lanjutkan dengan endpoint API kuis, sertifikat, dan halaman verifikasi publik.
-- Setelah E1–E4: kembali ke Tahap D (keandalan) sebelum go-live publik penuh.
+- Pipeline CI/CD hijau; setiap push ke `main` auto-deploy dengan tag timestamp WIB (deploy terakhir run #31 sukses).
+- Tahap C dan E lengkap dan tervalidasi live — **seluruh fitur PRD §3 sudah terbangun**.
+- **Berikutnya: Tahap D (keandalan)** — backup cron (D1), uji restore (D2), Uptime Kuma + Sentry (D3), job BullMQ rekonsiliasi/sertifikat/email (D4), load test (D5). Wajib sebelum go-live publik penuh.
 
 ## 10. Perintah Lanjutan yang Umum
 
