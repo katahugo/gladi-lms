@@ -33,11 +33,12 @@ Legend status: ⬜ TODO | 🔵 IN PROGRESS | ✅ DONE | ⏭️ SKIPPED | ⚠️ 
 
 | # | Langkah | Output yang Diharapkan | Hasil Anda (isi di sini) | Status |
 |---|---|---|---|---|
-| B1 | Buat VM B2ms Ubuntu 24.04 + disk data 64GB + Static IP | VM aktif, IP publik statis | IP: `...` / Nama VM: `...` / Region: `...` | ⬜ |
-| B2 | NSG: buka 80/443; SSH port custom dibatasi IP admin | Aturan firewall aktif | Port SSH: `...` / IP admin: `...` | ⬜ |
-| B3 | Hardening OS (user non-root, SSH key-only, ufw, fail2ban, unattended-upgrades, swap 4GB) | Server aman | User SSH: `...` / SSH key: `sudah/belum` | ⬜ |
-| B4 | Install Docker + mount disk data | Docker siap | Versi Docker: `...` | ⬜ |
-| B5 | Cloudflare: A record → IP VPS, proxy ON, SSL Full (strict) | Domain resolving ke VPS | Domain: `...` | ⬜ |
+| B1 | Buat VM B2ms Ubuntu 24.04 + disk data 64GB + Static IP | VM aktif, IP publik statis | IP: `70.153.16.78` / Nama VM: `vm-gladi-lms` / Region: `
+Indonesia Central` | ✅ |
+| B2 | NSG: buka 80/443; SSH port custom dibatasi IP admin | Aturan firewall aktif | Port SSH: `2020` / IP admin: `...` | ✅ |
+| B3 | Hardening OS (user non-root, SSH key-only, ufw, fail2ban, unattended-upgrades, swap 4GB) | Server aman | User SSH: `deploy` / SSH key: `sudah` | ✅ |
+| B4 | Install Docker + mount disk data | Docker siap | Versi Docker: `29.6.2` | ✅ |
+| B5 | Cloudflare: A record → IP VPS, proxy ON, SSL Full (strict) | Domain resolving ke VPS | Domain: `gladi.id` | ✅ |
 | B6 | Deploy compose pertama + Certbot SSL + isi secrets GitHub | https://domain hidup, CI/CD aktif | URL aktif: `...` / Secrets GitHub: `sudah/belum` | ⬜ |
 
 ---

@@ -11,7 +11,8 @@
 
 # ---- HTTP: ACME challenge + redirect ----
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name _;
 
     # Healthcheck lokal untuk healthcheck container nginx sendiri
@@ -34,7 +35,8 @@ server {
 
 # ---- HTTPS: aplikasi utama ----
 server {
-    listen 443 ssl;
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
     http2 on;
     server_name _;
 
@@ -58,7 +60,8 @@ server {
 
     # ---- Endpoint health app (tanpa rate limit, untuk Uptime Kuma) ----
     location = /api/health {
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         proxy_set_header Host $host;
         access_log off;
     }
@@ -66,20 +69,23 @@ server {
     # ---- Auth endpoints: rate limit ketat anti brute-force ----
     location ~ ^/api/auth/(signin|callback|register|reset) {
         limit_req zone=auth burst=10 nodelay;
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         include /etc/nginx/includes/proxy_common.conf;
     }
 
     # ---- API lain: rate limit longgar ----
     location /api/ {
         limit_req zone=api burst=50 nodelay;
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         include /etc/nginx/includes/proxy_common.conf;
     }
 
     # ---- Webhook payment gateway: tidak di-rate-limit (retry gateway harus lolos) ----
     location /api/webhooks/ {
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         include /etc/nginx/includes/proxy_common.conf;
         # Body besar untuk payload webhook
         client_max_body_size 2m;
@@ -87,7 +93,8 @@ server {
 
     # ---- Aset statis Next.js: cache agresif (immutable fingerprint) ----
     location /_next/static/ {
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         proxy_set_header Host $host;
         proxy_cache_valid 200 365d;
         add_header Cache-Control "public, max-age=31536000, immutable";
@@ -96,7 +103,8 @@ server {
 
     # ---- Semua request lain ----
     location / {
-        proxy_pass http://nextjs_app;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
         include /etc/nginx/includes/proxy_common.conf;
     }
 }

@@ -1,0 +1,14 @@
+# =============================================================================
+# File ini SENGAJA KOSONG (hanya komentar).
+#
+# Image nginx resmi menyertakan /etc/nginx/conf.d/default.conf bawaan dengan
+# "server_name localhost;" — blok itu MENCURI semua request ber-Host localhost
+# (termasuk healthcheck "wget http://localhost/health") karena exact server_name
+# match mengalahkan "server_name _" milik blok kita, sehingga /health dianggap
+# file statis dan 404.
+#
+# Entrypoint image nginx merender SEMUA /etc/nginx/templates/*.template ke
+# /etc/nginx/conf.d/ — dengan menamai file ini "default.conf.template", hasil
+# render-nya MENIMPA default.conf bawaan dengan file kosong ini.
+# Server blok aktif satu-satunya ada di lms.conf (render dari lms.conf.template).
+# =============================================================================
