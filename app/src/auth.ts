@@ -32,6 +32,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   session: { strategy: "jwt" },
 
+  // Wajib di balik reverse proxy (Nginx → container): percayai host dari header
+  // X-Forwarded-Host yang diteruskan Nginx. Tanpa ini Auth.js v5 menolak semua
+  // request dengan error UntrustedHost (500 "problem with server configuration")
+  // karena host internal container (0.0.0.0:3000) / domain tidak dikenali.
+  trustHost: true,
+
   pages: {
     signIn: "/login",
   },
