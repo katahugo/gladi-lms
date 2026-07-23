@@ -277,11 +277,26 @@ cp nginx/templates/lms.conf.template /tmp/nginx-backup/
 cp nginx/lms.conf.bootstrap nginx/templates/lms.conf.template
 
 docker compose up -d nginx
-docker compose exec -T certbot certbot certonly \
+
+# PENTING: hapus blok default.conf bawaan image (server_name localhost) yang
+# mencuri request /health dan ACME challenge, lalu reload:
+docker compose exec nginx sh -c 'printf "" > /etc/nginx/conf.d/default.conf'
+docker compose exec nginx nginx -s reload
+
+# Pastikan nginx healthy dulu (wajib, agar webroot challenge bisa dilayani):
+docker compose exec nginx wget -q -O- http://localhost/health   # harus: ok
+
+# Terbitkan sertifikat — gunakan "run --rm" (container one-shot), BUKAN "exec".
+# ("exec" hanya untuk container yang sudah running; certbot renew-loop belum
+#  kita start di sini, jadi "exec" akan error "service is not running".)
+docker compose run --rm certbot certbot certonly \
   --webroot -w /var/www/certbot \
   -d <DOMAIN_ANDA> \
   --email <EMAIL_ANDA> --agree-tos --no-eff-email
 # Harus muncul "Successfully received certificate"
+
+# Setelah sertifikat terbit, start certbot renew-loop (otomatis perpanjang tiap 12 jam):
+docker compose up -d certbot
 ```
 
 **Bagian 4 — Aktifkan config HTTPS penuh:**
