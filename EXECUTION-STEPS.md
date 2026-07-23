@@ -457,10 +457,11 @@ D1 membutuhkan **Storage Account Azure** (tempat menyimpan backup). Ada dua bagi
 5. Masuk ke storage account → menu **Containers** → **+ Container** → nama `lms-backups` → **Private** → **Create**.
 6. Menu **Shared Access Signature** (di sidebar kiri, bagian "Security + networking"):
    - Allowed services: **Blob**
-   - Allowed resource types: **Service**, **Container**, **Object**
-   - Allowed permissions: centang **Read**, **Write**, **Delete**, **List**
+   - Allowed resource types: **Service**, **Container**, **Object** ← **WAJIB ketiganya dicentang!** (tanpa Object, PUT blob ditolak 403)
+   - Allowed permissions: centang **Read**, **Write**, **Delete**, **List** ← **keempatnya wajib!**
    - Start date: biarkan (atau tanggal hari ini)
    - Expiry date: 2 tahun dari sekarang
+   - **Allowed IP addresses**: biarkan kosong dulu (nanti bila 403, tambahkan IP VPS Anda)
    - Klik **Generate SAS and connection string**
 7. Salin 3 nilai:
    - **Blob service SAS URL** → ambil token setelah tanda tanya `?sv=...` — ini adalah **`AZURE_STORAGE_SAS_TOKEN`** (tanpa tanda tanya depan)
@@ -504,6 +505,12 @@ Harus muncul: **"Backup pertama BERHASIL! D1 selesai."**
 tail -20 /var/log/lms-backup.log
 # Harus: "Backup SELESAI: pgdump-gladi_lms-20260724T...dump ter-upload aman."
 ```
+
+> **Troubleshooting D1:**
+> - **HTTP 403 AuthorizationFailure** → paling sering karena SAS token dibuat tanpa **Object** di resource types (perbaiki: generate ulang SAS dengan Service + Container + **Object** dicentang semua) ATAU firewall Storage Account memblokir IP VPS (perbaiki: Storage Account → Networking → Firewall → tambahkan IP VPS `70.153.16.78` ke allow list, atau set "Enabled from all networks").
+> - **`AZURE_STORAGE_SAS_TOKEN wajib diisi` padahal sudah ada** → SAS token mengandung karakter `&` — bungkus dengan kutip TUNGGAL: `AZURE_STORAGE_SAS_TOKEN='sv=...'`.
+> - **Backup berhasil tapi cron tidak jalan** → `crontab -l | grep gladi-lms` (harus menampilkan 1 baris); `systemctl status cron` (harus active).
+
 - [ ] Backup pertama sukses
 - [ ] Cron terpasang (`crontab -l | grep gladi-lms-backup` menampilkan 1 baris)
 - [ ] Snapshot VM pertama tersimpan di portal

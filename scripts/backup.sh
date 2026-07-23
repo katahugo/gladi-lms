@@ -64,6 +64,9 @@ echo "==> [2/3] Upload ke Azure Blob: ${AZURE_STORAGE_CONTAINER}/${BACKUP_NAME}"
 # SAS token di .env disimpan TANPA tanda tanya di depan
 SAS="${AZURE_STORAGE_SAS_TOKEN#\?}"
 
+# Debug: tampilkan prefix SAS (tanpa signature) untuk verifikasi format
+echo "    SAS prefix: ${SAS:0:60}..."
+
 HTTP_CODE="$(curl -sS -o /tmp/backup-upload-resp.txt -w "%{http_code}" \
   -X PUT \
   -H "x-ms-blob-type: BlockBlob" \
@@ -74,6 +77,16 @@ HTTP_CODE="$(curl -sS -o /tmp/backup-upload-resp.txt -w "%{http_code}" \
 if [ "$HTTP_CODE" != "201" ]; then
   echo "==> GAGAL upload (HTTP ${HTTP_CODE}):" >&2
   cat /tmp/backup-upload-resp.txt >&2
+  echo "" >&2
+  if [ "$HTTP_CODE" = "403" ]; then
+    echo "==> Diagnosis 403 AuthorizationFailure:" >&2
+    echo "    1. Pastikan SAS token dibuat dengan Resource Type: Service + Container + OBJECT" >&2
+    echo "       (Object wajib dicentang — tanpa ini, PUT blob ditolak)" >&2
+    echo "    2. Pastikan Permission: Read + Write + Delete + LIST (semua 4 dicentang)" >&2
+    echo "    3. Pastikan tanggal Start/Expiry SAS masih berlaku" >&2
+    echo "    4. Cek firewall Storage Account: tambahkan IP VPS Anda di whitelist" >&2
+    echo "       (Storage Account → Networking → Firewall → + Add your IP)" >&2
+  fi
   rm -f "$BACKUP_PATH" /tmp/backup-upload-resp.txt
   exit 1
 fi
