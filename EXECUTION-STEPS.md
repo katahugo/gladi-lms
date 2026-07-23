@@ -429,13 +429,83 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 | # | Langkah | Output | Status |
 |---|---|---|---|
-| D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | ⬜ |
+| D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | 🔵 |
 | D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ⬜ |
 | D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | ⬜ |
 | D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ⬜ |
 | D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | ⬜ |
 
-## Tahap E — Fitur Lanjutan (setelah go-live stabil)
+---
+
+### D1 — Aktifkan Backup Harian + Snapshot Mingguan
+
+D1 membutuhkan **Storage Account Azure** (tempat menyimpan backup). Ada dua bagian:
+1. **Anda di Azure Portal** — buat Storage Account + SAS token (5 menit)
+2. **VPS** — jalankan `scripts/setup-backup.sh` yang otomatis memasang cron
+
+**Bagian 1 — Azure Blob Storage (5 menit, di portal):**
+
+1. Buka `https://portal.azure.com` → **Storage accounts** → **Create**.
+2. **Basics:**
+   - Resource group: `gladi-lms-rg` (yang sama dengan VM).
+   - Storage account name: `gladilmsbackup` (atau nama unik, lowercase saja, tanpa strip).
+   - Region: **Indonesia Central** (sama dengan VM — agar transfer internal Azure gratis).
+   - Performance: **Standard**.
+   - Redundancy: **LRS (locally-redundant)** — paling murah, cukup untuk backup.
+3. **Advanced** → pilih **Allow enabling anonymous access** = off (default aman) — biarkan semua default.
+4. **Review + create** → tunggu deployment selesai.
+5. Masuk ke storage account → menu **Containers** → **+ Container** → nama `lms-backups` → **Private** → **Create**.
+6. Menu **Shared Access Signature** (di sidebar kiri, bagian "Security + networking"):
+   - Allowed services: **Blob**
+   - Allowed resource types: **Service**, **Container**, **Object**
+   - Allowed permissions: centang **Read**, **Write**, **Delete**, **List**
+   - Start date: biarkan (atau tanggal hari ini)
+   - Expiry date: 2 tahun dari sekarang
+   - Klik **Generate SAS and connection string**
+7. Salin 3 nilai:
+   - **Blob service SAS URL** → ambil token setelah tanda tanya `?sv=...` — ini adalah **`AZURE_STORAGE_SAS_TOKEN`** (tanpa tanda tanya depan)
+   - **Storage account name** → **`AZURE_STORAGE_ACCOUNT`**
+   - Container name → sudah kita buat: `lms-backups` → **`AZURE_STORAGE_CONTAINER`**
+
+**Bagian 2 — Di VPS (2 menit, SSH sebagai `deploy`):**
+
+```bash
+cd ~/gladi-lms
+git fetch origin main && git reset --hard origin/main
+
+# Isi 3 variabel Azure di .env (pakai nano):
+nano .env
+```
+Tambahkan di akhir file .env:
+```
+AZURE_STORAGE_ACCOUNT=gladilmsbackup
+AZURE_STORAGE_CONTAINER=lms-backups
+AZURE_STORAGE_SAS_TOKEN=sv=2025-01-05&ss=b&srt=sco&sp=rwdl&se=2028-07-23T...&sig=...
+```
+Simpan (Ctrl+O, Enter, Ctrl+X). Lalu:
+```bash
+# Jalankan setup otomatis (verifikasi + pasang cron + uji backup pertama)
+./scripts/setup-backup.sh
+```
+Harus muncul: **"Backup pertama BERHASIL! D1 selesai."**
+
+**Bagian 3 — Snapshot VM mingguan (di portal, 2 menit):**
+
+1. Buka portal Azure → VM `vm-gladi-lms` → menu **Disks** → klik disk OS (`gladi-lms-vm_OsDisk_1_...`) → **+ Create snapshot**.
+2. Nama: biarkan default (timestamp) → Resource group: `gladi-lms-rg` → **Create**.
+3. Untuk otomatisasi: buat **Automation account** atau cukup buat manual setiap minggu (proses ini 2 menit dan perlu Anda lakukan berkala).
+
+**Verifikasi backup berhasil:**
+```bash
+# Cek log backup
+tail -20 /var/log/lms-backup.log
+# Harus: "Backup SELESAI: pgdump-gladi_lms-20260724T...dump ter-upload aman."
+```
+- [ ] Backup pertama sukses
+- [ ] Cron terpasang (`crontab -l | grep gladi-lms-backup` menampilkan 1 baris)
+- [ ] Snapshot VM pertama tersimpan di portal
+
+---
 
 | # | Langkah | Status |
 |---|---|---|
