@@ -131,4 +131,8 @@ jobs:
             fi
             cd "$HOME/gladi-lms"
             export IMAGE_TAG="${{ needs.docker.outputs.image_tag }}"
+            # Diteruskan agar deploy.sh bisa docker login ghcr.io (pull image private).
+            # Token ini ephemeral — kedaluwarsa saat job selesai.
+            export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+            export GITHUB_ACTOR="${{ github.actor }}"
             ./scripts/deploy.sh
