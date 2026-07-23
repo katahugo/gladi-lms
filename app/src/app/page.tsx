@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 font-sans">
@@ -13,9 +15,15 @@ export default function Home() {
           Next.js + TypeScript + Tailwind + Drizzle ORM.
         </p>
         <div className="flex gap-4">
+          <Link
+            href="/courses"
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+          >
+            Lihat Katalog Kursus
+          </Link>
           <a
             href="/api/health"
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+            className="rounded-lg border border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
           >
             Cek Health API
           </a>
