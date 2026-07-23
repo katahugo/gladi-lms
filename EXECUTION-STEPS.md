@@ -446,5 +446,5 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 ---
 
-**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → **C1–C5 berikutnya** → D1–D5 → E1+.
-Tahap B selesai sepenuhnya — pipeline build→push→deploy otomatis berjalan tiap push ke `main`. Perintah cukup sebutkan kodenya, misal: "kerjakan C1".
+**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → ~~C1–C5~~ ✅ → **D1–D5 berikutnya** → E1+.
+Tahap C selesai — fitur inti MVP lengkap: katalog, video (Cloudflare Stream), materi (MinIO), checkout (Midtrans) + webhook idempotent, enrollment otomatis + progress tracking + halaman belajar. Perintah cukup sebutkan kodenya, misal: "kerjakan D1".
