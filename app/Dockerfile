@@ -21,6 +21,12 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# BUILD_SHA berubah tiap commit (diisi CI). ARG dideklarasikan SEBELUM COPY . .
+# agar layer context tidak tersaji dari cache basi yang tidak memuat file terbaru
+# (penyebab image CI sebelumnya kehilangan folder drizzle/).
+ARG BUILD_SHA=dev
+ENV BUILD_SHA=$BUILD_SHA
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
