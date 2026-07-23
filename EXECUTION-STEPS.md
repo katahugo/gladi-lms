@@ -276,27 +276,29 @@ mkdir -p /tmp/nginx-backup
 cp nginx/templates/lms.conf.template /tmp/nginx-backup/
 cp nginx/lms.conf.bootstrap nginx/templates/lms.conf.template
 
-docker compose up -d nginx
-
-# PENTING: hapus blok default.conf bawaan image (server_name localhost) yang
-# mencuri request /health dan ACME challenge, lalu reload:
-docker compose exec nginx sh -c 'printf "" > /etc/nginx/conf.d/default.conf'
-docker compose exec nginx nginx -s reload
+# PENTING: gunakan --no-deps agar compose TIDAK ikut menaikkan dependensi
+# (app/postgres/redis/minio) yang belum siap — tanpa ini compose menunggu
+# dependensi "healthy" dan container macet di status "Created".
+docker compose up -d --no-deps nginx
 
 # Pastikan nginx healthy dulu (wajib, agar webroot challenge bisa dilayani):
 docker compose exec nginx wget -q -O- http://localhost/health   # harus: ok
 
-# Terbitkan sertifikat — gunakan "run --rm" (container one-shot), BUKAN "exec".
-# ("exec" hanya untuk container yang sudah running; certbot renew-loop belum
-#  kita start di sini, jadi "exec" akan error "service is not running".)
-docker compose run --rm certbot certbot certonly \
-  --webroot -w /var/www/certbot \
+# Terbitkan sertifikat — gunakan service "certbot-issue" (TANPA override
+# entrypoint, jadi argumen Anda benar-benar dijalankan).
+# PENTING: JANGAN pakai "docker compose run certbot certbot certonly ..." —
+# service "certbot" punya entrypoint renew-loop yang MENGABAIKAN semua argumen
+# (container akan menggantung tanpa melakukan apa-apa). Subcommand "certonly"
+# diletakkan di AKHIR setelah flag-flagnya.
+docker compose run --rm --no-deps certbot-issue \
   -d <DOMAIN_ANDA> \
-  --email <EMAIL_ANDA> --agree-tos --no-eff-email
+  --email <EMAIL_ANDA> --agree-tos --no-eff-email \
+  --webroot -w /var/www/certbot \
+  certonly
 # Harus muncul "Successfully received certificate"
 
 # Setelah sertifikat terbit, start certbot renew-loop (otomatis perpanjang tiap 12 jam):
-docker compose up -d certbot
+docker compose up -d --no-deps certbot
 ```
 
 **Bagian 4 — Aktifkan config HTTPS penuh:**
@@ -338,9 +340,13 @@ docker compose exec app npx drizzle-kit migrate
 ---
 
 > **Troubleshooting cepat B6:**
+> - **Certbot menggantung / tidak melakukan apa-apa** → hampir pasti Anda menjalankan `docker compose run certbot certbot certonly ...` (service `certbot` yang entrypoint-nya renew-loop dan mengabaikan argumen). Solusi: gunakan `certbot-issue` — lihat Bagian 3.
+> - **Container macet di status "Created"** → penyebab: `docker compose up`/`run` tanpa `--no-deps` ikut menaikkan dependensi (app/postgres/redis/minio) yang belum siap. Solusi: selalu pakai `--no-deps` pada langkah bootstrap.
+> - **Container stuck "health: starting"** → tunggu 10–20 detik lalu `docker compose ps` lagi; kalau tetap, `docker compose logs <service>`.
 > - Certbot gagal "connection refused/timeout" → cek NSG (B2) membuka port 80 dari Any, dan DNS (B5) sudah resolve.
 > - `curl https://domain` error sertifikat → mode SSL Cloudflare belum **Full (strict)** (B5 langkah 3).
 > - `docker compose ps` ada yang "unhealthy" → `docker compose logs <service>` lalu kabari saya outputnya.
+> - **Minio "unhealthy"** saat bootstrap → normal jika baru pertama up (butuh waktu init); tidak masalah karena langkah bootstrap pakai `--no-deps`.
 
 ## Tahap C — Fitur Inti MVP (lokal, setelah A4–A6)
 

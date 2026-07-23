@@ -54,7 +54,13 @@ services:
       start_period: 10s
 
   # ---------------------------------------------------------------------------
-  # SSL certificate issuer/renewer
+  # SSL certificate renewer (loop 12 jam — untuk perpanjangan otomatis)
+  # CATATAN PENTING: entrypoint service ini di-override menjadi renew-loop,
+  # sehingga SEMUA argumen setelah "certbot" pada `docker compose run certbot ...`
+  # akan DIABAIKAN (renew-loop tidak meneruskannya).
+  # => Untuk MENERBITKAN sertifikat pertama kali (Tahap B6), JANGAN pakai
+  #    service ini. Gunakan service "certbot-issue" di bawah, atau:
+  #      docker compose run --rm --no-deps certbot-issue -d DOMAIN --email EMAIL ...
   # ---------------------------------------------------------------------------
   certbot:
     image: certbot/certbot:v2.11.0
@@ -62,11 +68,31 @@ services:
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
-    # Entrypoint diganti di Tahap B6 saat provisioning SSL pertama kali.
-    # Default: renew setiap 12 jam (Let's Encrypt merekomendasikan cek 2x/hari).
+    # Renew loop: cek perpanjangan tiap 12 jam (rekomendasi Let's Encrypt 2x/hari).
     entrypoint: >
       /bin/sh -c "trap exit TERM;
       while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    networks:
+      - lms_net
+    mem_limit: 128m
+    cpus: 0.1
+
+  # ---------------------------------------------------------------------------
+  # Penerbitan sertifikat one-shot (Tahap B6) — TANPA override entrypoint,
+  # sehingga argumen diteruskan langsung ke binary certbot.
+  # Pemakaian:
+  #   docker compose run --rm --no-deps certbot-issue \
+  #     -d DOMAIN_ANDA --email EMAIL_ANDA --agree-tos --no-eff-email \
+  #     --webroot -w /var/www/certbot certonly
+  # (subcommand "certonly" di akhir; flag-nya sebelum itu)
+  # ---------------------------------------------------------------------------
+  certbot-issue:
+    image: certbot/certbot:v2.11.0
+    container_name: lms_certbot_issue
+    profiles: ["setup"]          # tidak ikut 'up' biasa; hanya saat dipanggil eksplisit
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
     networks:
       - lms_net
     mem_limit: 128m
