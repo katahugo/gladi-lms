@@ -322,18 +322,24 @@ cd ~/gladi-lms
 docker compose up -d postgres redis minio
 docker compose ps            # tunggu sampai postgres/redis/minio "healthy"
 
-# 2. Build image app (pertama kali butuh beberapa menit)
+# 2. Build image app dan worker dengan tag TERPISAH (jangan timpa image app
+#    yang sedang berjalan — compose menandai keduanya ':latest' bila dibangun
+#    bersamaan, dan build terakhir yang menang):
 docker compose build app
+docker tag ghcr.io/katahugo/gladi-lms/app:latest lms-local/app:latest
+docker compose build worker
+docker tag ghcr.io/katahugo/gladi-lms/worker:latest lms-local/worker:latest
 
 # 3. Migrasi database SEBELUM app dinyalakan penuh
 #    (pakai run one-shot di network internal, bukan exec ke app yang belum jalan)
 set -a; source .env; set +a
-docker compose run --rm --no-deps \
+APP_IMAGE=lms-local/app:latest docker compose run --rm --no-deps \
   -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
   app npx drizzle-kit migrate
 
 # 4. Naikkan app + worker + nginx + certbot renew-loop + uptime-kuma
-docker compose up -d
+#    dengan tag lokal yang sudah dipisah:
+APP_IMAGE=lms-local/app:latest WORKER_IMAGE=lms-local/worker:latest docker compose up -d
 
 # 5. Verifikasi menyeluruh
 docker compose ps                          # semua harus Up/healthy

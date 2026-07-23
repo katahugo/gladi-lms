@@ -147,7 +147,7 @@ services:
   # ---------------------------------------------------------------------------
   worker:
     <<: *restart_policy
-    image: ${APP_IMAGE:-ghcr.io/katahugo/gladi-lms/app:latest}
+    image: ${WORKER_IMAGE:-ghcr.io/katahugo/gladi-lms/worker:latest}
     container_name: lms_worker
     build:
       context: ./app

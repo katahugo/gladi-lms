@@ -22,6 +22,7 @@ REGISTRY="ghcr.io"
 IMAGE_REPO="${GITHUB_REPOSITORY:-katahugo/gladi-lms}"
 IMAGE_REPO="$(echo "$IMAGE_REPO" | tr '[:upper:]' '[:lower:]')"
 NEW_IMAGE="$REGISTRY/$IMAGE_REPO/app:$IMAGE_TAG"
+NEW_WORKER_IMAGE="$REGISTRY/$IMAGE_REPO/worker:$IMAGE_TAG"
 
 echo "==> [1/5] Sinkronisasi konfigurasi dari git"
 if [ -d .git ]; then
@@ -29,16 +30,18 @@ if [ -d .git ]; then
   git reset --hard origin/main
 fi
 
-echo "==> [2/5] Pull image: $NEW_IMAGE"
+echo "==> [2/5] Pull images: $NEW_IMAGE + $NEW_WORKER_IMAGE"
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-deploy}" --password-stdin
 fi
 
 # Simpan image yang sedang berjalan untuk rollback
 CURRENT_IMAGE="$(docker inspect --format='{{.Config.Image}}' lms_app 2>/dev/null || true)"
-echo "    Image saat ini: ${CURRENT_IMAGE:-<belum ada>}"
+CURRENT_WORKER_IMAGE="$(docker inspect --format='{{.Config.Image}}' lms_worker 2>/dev/null || true)"
+echo "    Image saat ini: ${CURRENT_IMAGE:-<belum ada>} / worker: ${CURRENT_WORKER_IMAGE:-<belum ada>}"
 
 docker pull "$NEW_IMAGE"
+docker pull "$NEW_WORKER_IMAGE"
 
 echo "==> [3/5] Migrasi database (one-shot)"
 # Jalankan migrasi memakai image aplikasi, di network internal compose,
@@ -60,7 +63,7 @@ docker run --rm \
   npx drizzle-kit migrate
 
 echo "==> [4/5] Restart service dengan image baru"
-APP_IMAGE="$NEW_IMAGE" docker compose up -d --remove-orphans
+APP_IMAGE="$NEW_IMAGE" WORKER_IMAGE="$NEW_WORKER_IMAGE" docker compose up -d --remove-orphans
 
 echo "==> [5/5] Health check"
 HEALTHY=0
@@ -80,8 +83,8 @@ if [ "$HEALTHY" -eq 1 ]; then
 else
   echo "==> Health check GAGAL — rollback"
   if [ -n "$CURRENT_IMAGE" ] && [ "$CURRENT_IMAGE" != "$NEW_IMAGE" ]; then
-    echo "    Kembali ke: $CURRENT_IMAGE"
-    APP_IMAGE="$CURRENT_IMAGE" docker compose up -d --remove-orphans
+    echo "    Kembali ke: $CURRENT_IMAGE / worker: ${CURRENT_WORKER_IMAGE:-$CURRENT_IMAGE}"
+    APP_IMAGE="$CURRENT_IMAGE" WORKER_IMAGE="${CURRENT_WORKER_IMAGE:-$CURRENT_IMAGE}" docker compose up -d --remove-orphans
     sleep 10
     if curl -fsS http://localhost/api/health >/dev/null 2>&1; then
       echo "==> Rollback berhasil — sistem kembali ke versi sebelumnya"

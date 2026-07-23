@@ -29,6 +29,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/app
+  WORKER_IMAGE_NAME: ${{ github.repository }}/worker
 
 concurrency:
   group: deploy-main
@@ -81,7 +82,7 @@ jobs:
       - id: meta
         run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      # Image app (target default) — :latest + :sha-xxx
+      # Image app (target app) — :latest + :sha-xxx
       - uses: docker/build-push-action@v6
         with:
           context: ./app
@@ -92,6 +93,18 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
+
+      # Image worker (target worker) — tag terpisah agar tidak tertimpa image app
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./app
+          target: worker
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,mode=max,scope=worker
 
   # ---------------------------------------------------------------------------
   deploy:
