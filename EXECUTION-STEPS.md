@@ -405,7 +405,7 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 **Tersisa dari B6:** Bagian 6 (isi 4 secrets GitHub: `VPS_HOST=70.153.16.78`, `VPS_USER=deploy`, `VPS_PORT=2020`, `VPS_SSH_KEY`). Setelah itu pipeline CI/CD (A7) aktif dan deploy tidak lagi manual.
 
-**Update 23 Jul 2026 — Bagian 6 SELESAI, CI/CD aktif.** Secrets terisi, pipeline hijau (run #17). Pelajaran tambahan yang diperbaiki selama aktivasi CI/CD:
+**Update 23 Jul 2026 — Bagian 6 SELESAI, CI/CD aktif.** Secrets terisi, pipeline hijau (run #17). Setiap build image kini juga ditandai timestamp **GMT+7 (WIB)** format `YYYYMMDD-HHMMSS` (mis. `worker:20260723-131519`) + label `build-time-wib`, terlihat di GHCR. Pelajaran tambahan yang diperbaiki selama aktivasi CI/CD:
 8. **SSH gagal 1.8 dtk** → public key deploy belum terdaftar di `/home/deploy/.ssh/authorized_keys`.
 9. **`cd: /home/deploy/gladi-lms: No such file`** → repo awalnya di `/root/gladi-lms`; dipindah ke `/home/deploy/` + workflow dibuat auto-clone bila belum ada.
 10. **`cd: /root/gladi-lms` saat dijalankan root** → `APP_DIR` kini ditentukan dari lokasi skrip, bukan `$HOME`.
