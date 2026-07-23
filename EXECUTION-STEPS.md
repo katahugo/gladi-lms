@@ -303,22 +303,42 @@ docker compose up -d --no-deps certbot
 
 **Bagian 4 — Aktifkan config HTTPS penuh:**
 ```bash
+# Kembalikan config HTTPS penuh (yang ada blok 443), ganti yang bootstrap:
 cp /tmp/nginx-backup/lms.conf.template nginx/templates/lms.conf.template
-docker compose restart nginx
+
+# Recreate nginx (bukan sekadar restart) agar template HTTPS ter-render ulang:
+docker compose up -d --no-deps --force-recreate nginx
+
+# Verifikasi HTTPS sudah hidup (sertifikat yang baru terbit dipakai):
 curl -sI https://<DOMAIN_ANDA> | head -3   # harus 200/301/302, bukan error SSL
 ```
 
-**Bagian 5 — Build & jalankan aplikasi pertama kali:**
-*(Sementara CI/CD belum ada image, build langsung di VPS — hanya untuk deploy pertama. Setelah ini, build selalu di CI.)*
+**Bagian 5 — Jalankan seluruh komponen:**
+*(Sementara CI/CD belum ada image, build `app` langsung di VPS — hanya untuk deploy pertama. Setelah CI/CD aktif, build selalu di CI runner.)*
 ```bash
 cd ~/gladi-lms
+
+# 1. Naikkan database & pendukung DULU, tunggu healthy (penting: app butuh ini)
+docker compose up -d postgres redis minio
+docker compose ps            # tunggu sampai postgres/redis/minio "healthy"
+
+# 2. Build image app (pertama kali butuh beberapa menit)
 docker compose build app
+
+# 3. Migrasi database SEBELUM app dinyalakan penuh
+#    (pakai run one-shot di network internal, bukan exec ke app yang belum jalan)
+set -a; source .env; set +a
+docker compose run --rm --no-deps \
+  -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
+  app npx drizzle-kit migrate
+
+# 4. Naikkan app + worker + nginx + certbot renew-loop + uptime-kuma
 docker compose up -d
-docker compose ps                        # semua harus Up/healthy
-curl -s http://localhost/api/health      # lewat nginx → {"status":"ok",...}
-curl -s https://<DOMAIN_ANDA>/api/health # lewat Cloudflare+SSL → {"status":"ok",...}
-# Migrasi database
-docker compose exec app npx drizzle-kit migrate
+
+# 5. Verifikasi menyeluruh
+docker compose ps                          # semua harus Up/healthy
+curl -s http://localhost/api/health        # lewat nginx lokal → {"status":"ok",...}
+curl -s https://<DOMAIN_ANDA>/api/health   # lewat Cloudflare+SSL → {"status":"ok",...}
 ```
 
 **Bagian 6 — Isi secrets GitHub agar CI/CD (A7) aktif:**
@@ -347,6 +367,9 @@ docker compose exec app npx drizzle-kit migrate
 > - `curl https://domain` error sertifikat → mode SSL Cloudflare belum **Full (strict)** (B5 langkah 3).
 > - `docker compose ps` ada yang "unhealthy" → `docker compose logs <service>` lalu kabari saya outputnya.
 > - **Minio "unhealthy"** saat bootstrap → normal jika baru pertama up (butuh waktu init); tidak masalah karena langkah bootstrap pakai `--no-deps`.
+> - **`docker compose exec app ...` gagal "container not running"** → app belum Up. Lakukan migrasi via `run --rm --no-deps` seperti Bagian 5 langkah 3 (jangan `exec` ke app yang belum jalan).
+> - **App "unhealthy" setelah up** → hampir selalu migrasi belum dijalankan atau `DATABASE_URL` salah. Cek `docker compose logs app`.
+> - **`curl https://domain` 502 Bad Gateway** → nginx jalan tapi app belum/mati. Cek `docker compose ps app` dan `docker compose logs app`.
 
 ## Tahap C — Fitur Inti MVP (lokal, setelah A4–A6)
 
