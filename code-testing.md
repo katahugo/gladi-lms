@@ -12,6 +12,22 @@ untuk pengujian lokal.
 
 ---
 
+## Ringkasan Progress (diperbarui 23 Jul 2026)
+
+| Status | Jumlah | Kasus |
+|---|---|---|
+| ✅ Lolos | 7 | 0.1, 1.1, 1.4, 4.5, 4.6, 6 (4 dari 5 sub-kasus API) |
+| ⏸ Terblokir | sisanya | Semua kasus yang butuh login (0.2, 0.3, 1.2, 1.3, 1.5, Bagian 2–5) |
+
+**Pemblokir:** endpoint `/api/auth/*` mengembalikan **500** di produksi setelah
+deploy C1, sehingga login tidak bisa dilakukan. Bukan bug fitur C1 — masalah
+konfigurasi Auth.js di deployment. **Tindakan yang dibutuhkan (di VPS):**
+`docker compose logs --tail=60 app | grep -iE "error|auth|secret"` untuk diagnosis.
+Selain itu, promosi role instruktur (0.2) butuh `UPDATE users SET role='instructor'`
+via DB di VPS (SSH dari lingkungan uji saya ditolak publickey).
+
+---
+
 ## Bagian 0 — Persiapan (wajib sebelum pengujian)
 
 ### 0.1 Buat akun siswa biasa
@@ -24,7 +40,7 @@ untuk pengujian lokal.
      -d '{"name":"Siswa Uji","email":"siswa@uji.id","password":"password123"}'
    ```
    **Harapan:** respons `201` berisi `{"id":"...","email":"siswa@uji.id"}`.
-   - [ ] Lolos
+   - [x] Lolos — `201`, id `894b58b5-...` (diuji 23 Jul 2026)
 
 ### 0.2 Buat akun instruktur (promosi manual via database)
 
@@ -46,8 +62,8 @@ wewenang admin, dilakukan via DB sampai dashboard admin ada di Tahap E3).
    docker exec lms_postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} \
      -c "UPDATE users SET role='instructor' WHERE email='instruktur@uji.id';"
    ```
-   **Harapan:** output `UPDATE 1`.
-   - [ ] Lolos
+    **Harapan:** output `UPDATE 1`.
+    - [ ] Lolos — ⏸ menunggu: registrasi `instruktur@uji.id` (201 ✓) sudah, tapi promosi role via DB butuh SSH ke VPS (SSH dari lingkungan uji saya ditolak publickey). Jalankan perintah `UPDATE users SET role='instructor' WHERE email IN ('instruktur@uji.id','instruktur2@uji.id');` di VPS.
 
 ### 0.3 Verifikasi login kedua akun
 
@@ -61,11 +77,13 @@ wewenang admin, dilakukan via DB sampai dashboard admin ada di Tahap E3).
 
 | # | Kasus Uji | Langkah | Hasil yang Diharapkan | Status |
 |---|---|---|---|---|
-| 1.1 | Anonim buka builder | Logout, buka `/instructor/courses` | Redirect 307 ke `/login?callbackUrl=/instructor/courses` | [ ] |
-| 1.2 | Siswa buka builder | Login sebagai siswa, buka `/instructor/courses` | Redirect ke `/` (bukan halaman builder) | [ ] |
-| 1.3 | Instruktur buka builder | Login sebagai instruktur, buka `/instructor/courses` | Halaman "Kursus Saya" tampil | [ ] |
-| 1.4 | Anonim buka katalog | Logout, buka `/courses` | Halaman katalog tampil (publik, tanpa login) | [ ] |
-| 1.5 | Siswa buka katalog | Login siswa, buka `/courses` | Halaman katalog tampil | [ ] |
+| 1.1 | Anonim buka builder | Logout, buka `/instructor/courses` | Redirect 307 ke `/login?callbackUrl=/instructor/courses` | [x] |
+| 1.2 | Siswa buka builder | Login sebagai siswa, buka `/instructor/courses` | Redirect ke `/` (bukan halaman builder) | [ ] ⏸ |
+| 1.3 | Instruktur buka builder | Login sebagai instruktur, buka `/instructor/courses` | Halaman "Kursus Saya" tampil | [ ] ⏸ |
+| 1.4 | Anonim buka katalog | Logout, buka `/courses` | Halaman katalog tampil (publik, tanpa login) | [x] |
+| 1.5 | Siswa buka katalog | Login siswa, buka `/courses` | Halaman katalog tampil | [ ] ⏸ |
+
+> **⚠ PEMBLOKIR (23 Jul 2026):** Kasus yang membutuhkan login (1.2, 1.3, 1.5, dan seluruh Bagian 2–5) **terblokir sementara** — endpoint `/api/auth/*` mengembalikan **500 "problem with server configuration"** di produksi setelah deploy C1, sehingga login tidak bisa dilakukan. Halaman `/login` (UI) dan registrasi/DB masih berfungsi normal. Ini bukan bug fitur C1 melainkan masalah konfigurasi Auth.js di deployment. Sedang didiagnosis — butuh `docker compose logs app` dari VPS untuk memastikan penyebab.
 
 ---
 
@@ -113,8 +131,8 @@ Prasyarat: minimal 1 kursus berstatus **Terbit** (dari Bagian 3).
 | 4.2 | Harga gratis | Pada kursus harga 0 | Kartu menampilkan teks **"Gratis"** | [ ] |
 | 4.3 | Buka detail | Klik kartu kursus | Halaman `/courses/<slug>` tampil: judul, deskripsi, harga, tombol beli, kurikulum | [ ] |
 | 4.4 | Format rupiah | Kursus harga 150000 | Tampil "Rp150.000" | [ ] |
-| 4.5 | Slug tidak ada | Buka `/courses/slug-ngasal` | Halaman 404 | [ ] |
-| 4.6 | Tautan dari landing | Buka `/` → klik "Lihat Katalog Kursus" | Tiba di `/courses` | [ ] |
+| 4.5 | Slug tidak ada | Buka `/courses/slug-ngasal` | Halaman 404 | [x] |
+| 4.6 | Tautan dari landing | Buka `/` → klik "Lihat Katalog Kursus" | Tiba di `/courses` | [x] |
 
 ---
 
@@ -125,9 +143,9 @@ dengan email `instruktur2@uji.id`.
 
 | # | Kasus Uji | Langkah | Hasil yang Diharapkan | Status |
 |---|---|---|---|---|
-| 5.1 | Edit kursus orang lain via URL | Login instruktur2, buka `/instructor/courses/<id-kursus-instruktur1>/edit` | 404 (bukan data bocor) | [ ] |
-| 5.2 | Daftar kursus terisolasi | Bandingkan `/instructor/courses` kedua instruktur | Masing-masing hanya melihat kursus miliknya | [ ] |
-| 5.3 | Hapus kursus | Pada kursus sendiri, klik **Hapus** → konfirmasi | Kursus hilang dari daftar dan dari katalog | [ ] |
+| 5.1 | Edit kursus orang lain via URL | Login instruktur2, buka `/instructor/courses/<id-kursus-instruktur1>/edit` | 404 (bukan data bocor) | [ ] ⏸ |
+| 5.2 | Daftar kursus terisolasi | Bandingkan `/instructor/courses` kedua instruktur | Masing-masing hanya melihat kursus miliknya | [ ] ⏸ |
+| 5.3 | Hapus kursus | Pada kursus sendiri, klik **Hapus** → konfirmasi | Kursus hilang dari daftar dan dari katalog | [ ] ⏸ |
 
 ---
 
@@ -150,7 +168,7 @@ curl.exe -s -X POST https://gladi.id/api/register \
 ```
 
 Hasil yang diharapkan: `200`, `200`, `307 .../login?callbackUrl=...`, `409`.
-- [ ] Lolos semua
+- [x] Lolos sebagian (23 Jul 2026): katalog `200` ✓, slug-ngasal `404` ✓, builder anonim `307` ✓, duplikat email `409` ✓. Kasus "detail kursus terbit 200" menunggu ada kursus terbit (butuh login instruktur — terblokir masalah auth 500).
 
 ---
 
