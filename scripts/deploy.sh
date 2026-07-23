@@ -60,9 +60,15 @@ if [ -z "$NETWORK_NAME" ]; then
 fi
 echo "    Network: $NETWORK_NAME"
 set -a; source .env; set +a
+# Kredensial dioper sebagai field terpisah (bukan URL) agar password dengan
+# karakter khusus tidak merusak parsing URL di dalam migrate.mjs.
 docker run --rm \
   --network "$NETWORK_NAME" \
-  -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
+  -e PGHOST=postgres \
+  -e PGPORT=5432 \
+  -e PGDATABASE="${POSTGRES_DB}" \
+  -e PGUSER="${POSTGRES_USER}" \
+  -e PGPASSWORD="${POSTGRES_PASSWORD}" \
   "$NEW_IMAGE" \
   node migrate.mjs
 

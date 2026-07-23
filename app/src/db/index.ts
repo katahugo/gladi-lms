@@ -4,21 +4,37 @@ import * as schema from "./schema";
 
 /**
  * Koneksi database PostgreSQL.
- * DATABASE_URL di-inject via environment (docker-compose / .env lokal).
- * Driver: postgres.js (ringan, cocok untuk serverless & standalone).
  *
- * Catatan: saat `next build`, DATABASE_URL boleh kosong (Dockerfile memberi
- * placeholder) — koneksi lazy, baru benar-benar dipakai saat query pertama.
- * Runtime production tanpa DATABASE_URL akan gagal saat query, bukan saat import.
+ * Kredensial dibaca sebagai FIELD TERPISAH (PGHOST/PGUSER/PGPASSWORD/PGDATABASE)
+ * — BUKAN menempelkan password mentah ke DATABASE_URL, karena password dengan
+ * karakter khusus merusak parsing URL (URIError: URI malformed). DATABASE_URL
+ * tetap didukung sebagai fallback (mis. untuk development lokal).
+ *
+ * Driver: postgres.js (ringan, cocok untuk serverless & standalone).
+ * Catatan: saat `next build`, kredensial boleh kosong — koneksi lazy, baru
+ * benar-benar dipakai saat query pertama.
  */
-const connectionString =
-  process.env.DATABASE_URL ?? "postgresql://placeholder:placeholder@localhost:5432/placeholder";
+function buildClient() {
+  const common = { max: 10, prepare: true };
+
+  if (process.env.PGDATABASE || process.env.PGHOST) {
+    return postgres({
+      ...common,
+      host: process.env.PGHOST ?? "localhost",
+      port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+      database: process.env.PGDATABASE ?? "placeholder",
+      username: process.env.PGUSER ?? "placeholder",
+      password: process.env.PGPASSWORD ?? "placeholder",
+    });
+  }
+  const url =
+    process.env.DATABASE_URL ??
+    "postgresql://placeholder:placeholder@localhost:5432/placeholder";
+  return postgres(url, common);
+}
 
 // max: 10 koneksi per container — total app+worker (20) masih di bawah
 // max_connections=50 Postgres (lihat docker-compose.yml tuning)
-const client = postgres(connectionString, {
-  max: 10,
-  prepare: true,
-});
+const client = buildClient();
 
 export const db = drizzle(client, { schema });
