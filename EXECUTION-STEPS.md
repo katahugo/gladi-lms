@@ -335,7 +335,7 @@ docker tag ghcr.io/katahugo/gladi-lms/worker:latest lms-local/worker:latest
 set -a; source .env; set +a
 APP_IMAGE=lms-local/app:latest docker compose run --rm --no-deps \
   -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
-  app npx drizzle-kit migrate
+  app node migrate.mjs
 
 # 4. Naikkan app + worker + nginx + certbot renew-loop + uptime-kuma
 #    dengan tag lokal yang sudah dipisah:

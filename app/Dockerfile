@@ -49,9 +49,12 @@ FROM base AS app
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# Migrasi dijalankan dari image ini oleh scripts/deploy.sh (step sebelum restart)
+# Migrasi dijalankan dari image ini oleh scripts/deploy.sh (step sebelum restart).
+# Skrip migrate.mjs memakai drizzle-orm (dependency produksi, ikut ter-bundle di
+# standalone) — bukan drizzle-kit (devDependency, tidak ada di image produksi).
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs ./migrate.mjs
 
 USER nextjs
 EXPOSE 3000

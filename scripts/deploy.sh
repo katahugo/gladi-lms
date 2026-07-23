@@ -60,7 +60,7 @@ docker run --rm \
   --network "$NETWORK_NAME" \
   -e DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" \
   "$NEW_IMAGE" \
-  npx drizzle-kit migrate
+  node migrate.mjs
 
 echo "==> [4/5] Restart service dengan image baru"
 APP_IMAGE="$NEW_IMAGE" WORKER_IMAGE="$NEW_WORKER_IMAGE" docker compose up -d --remove-orphans
