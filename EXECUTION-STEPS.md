@@ -39,7 +39,7 @@ Indonesia Central` | ✅ |
 | B3 | Hardening OS (user non-root, SSH key-only, ufw, fail2ban, unattended-upgrades, swap 4GB) | Server aman | User SSH: `deploy` / SSH key: `sudah` | ✅ |
 | B4 | Install Docker + mount disk data | Docker siap | Versi Docker: `29.6.2` | ✅ |
 | B5 | Cloudflare: A record → IP VPS, proxy ON, SSL Full (strict) | Domain resolving ke VPS | Domain: `gladi.id` | ✅ |
-| B6 | Deploy compose pertama + Certbot SSL + isi secrets GitHub | https://domain hidup, CI/CD aktif | URL aktif: `https://gladi.id` (health OK) / Secrets GitHub: `belum` | ✅ |
+| B6 | Deploy compose pertama + Certbot SSL + isi secrets GitHub | https://domain hidup, CI/CD aktif | URL aktif: `https://gladi.id` (health OK) / Secrets GitHub: `sudah` / CI/CD: `aktif (run #17 sukses)` | ✅ |
 
 ---
 
@@ -405,6 +405,16 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 **Tersisa dari B6:** Bagian 6 (isi 4 secrets GitHub: `VPS_HOST=70.153.16.78`, `VPS_USER=deploy`, `VPS_PORT=2020`, `VPS_SSH_KEY`). Setelah itu pipeline CI/CD (A7) aktif dan deploy tidak lagi manual.
 
+**Update 23 Jul 2026 — Bagian 6 SELESAI, CI/CD aktif.** Secrets terisi, pipeline hijau (run #17). Pelajaran tambahan yang diperbaiki selama aktivasi CI/CD:
+8. **SSH gagal 1.8 dtk** → public key deploy belum terdaftar di `/home/deploy/.ssh/authorized_keys`.
+9. **`cd: /home/deploy/gladi-lms: No such file`** → repo awalnya di `/root/gladi-lms`; dipindah ke `/home/deploy/` + workflow dibuat auto-clone bila belum ada.
+10. **`cd: /root/gladi-lms` saat dijalankan root** → `APP_DIR` kini ditentukan dari lokasi skrip, bukan `$HOME`.
+11. **`Cannot find module 'drizzle-kit'`** → migrasi dipindah ke `migrate.mjs` (drizzle-orm, di-bundle esbuild ESM) — drizzle-kit adalah devDependency, tidak ada di image produksi.
+12. **`Cannot find package 'drizzle-orm'`** → `migrate.mjs` di-bundle esbuild jadi file mandiri; node_modules standalone tidak menyertakannya.
+13. **`URIError: URI malformed` Postgres** → sama seperti Redis — kredensial kini field terpisah `PGHOST/PGUSER/PGPASSWORD/PGDATABASE` di `migrate.mjs`, `db/index.ts`, compose, deploy.sh.
+14. **`No file drizzle/0000_init.sql`** (root cause paling licin) → pola `*.sql` di `.gitignore` (untuk dump DB) ikut mengabaikan file migrasi Drizzle sehingga tak pernah ter-commit. Diperbaiki dengan `!**/drizzle/**/*.sql`.
+15. **Cache CI basi** → `BUILD_SHA` build-arg sebelum `COPY . .` di Dockerfile agar layer context ter-invalidate tiap commit.
+
 ## Tahap C — Fitur Inti MVP (lokal, setelah A4–A6)
 
 | # | Langkah | Output | Status |
@@ -436,5 +446,5 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 
 ---
 
-**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live: `https://gladi.id`, 23 Jul 2026) → **C1–C5 berikutnya** → D1–D5 → E1+.
-Tersisa dari B: Bagian 6 (isi 4 secrets GitHub agar CI/CD aktif). Perintah cukup sebutkan kodenya, misal: "kerjakan C1".
+**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → **C1–C5 berikutnya** → D1–D5 → E1+.
+Tahap B selesai sepenuhnya — pipeline build→push→deploy otomatis berjalan tiap push ke `main`. Perintah cukup sebutkan kodenya, misal: "kerjakan C1".
