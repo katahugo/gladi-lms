@@ -691,3 +691,61 @@ Setelah itu, buka `https://monitoring.gladi.id` di browser — Uptime Kuma akan 
 
 **Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + CI/CD aktif) → ~~C1–C5~~ ✅ → ~~E1–E4~~ ✅ → ~~D1–D4~~ ✅ → **D5 berikutnya** (load test + validasi akhir).
 Fitur lengkap sesuai PRD §3 + keandalan. Perintah cukup sebutkan kodenya, misal: "kerjakan D5".
+
+---
+
+### D5 — Load Test + Checklist Validasi Akhir
+
+D5 adalah langkah terakhir sebelum go-live publik penuh. Dua bagian:
+1. **Load test** — buktikan B2ms mampu menangani beban dasar dengan k6
+2. **Checklist validasi akhir** — 8 item dari plan §6
+
+---
+
+**1. Load test dengan k6**
+
+Skrip load test: `scripts/load-test.js`. Mensimulasikan 10 user simultan selama 2 menit (ramp-up bertahap) mengakses landing page, katalog, health API, registrasi.
+
+Jalankan dari laptop Anda (PowerShell, butuh k6 terinstal):
+```bash
+# Install k6 (sekali): winget install k6
+k6 run scripts/load-test.js
+```
+
+Hasil yang diharapkan:
+- **Error rate < 5%**
+- **p95 response time < 3 detik** (seluruh request)
+- **Katalog < 2.5 detik** (LCP PRD)
+- Verdict: **LULUS**
+
+Jika gagal: cek `docker stats` di VPS saat load test (CPU/RAM B2ms), `docker compose logs app` untuk error.
+
+---
+
+**2. Checklist validasi akhir (plan §6)**
+
+| # | Item | Cara Uji | Harapan | Status |
+|---|---|---|---|---|
+| 1 | Halaman katalog < 2.5 detik LCP | Load test k6 atau Chrome DevTools Lighthouse | p95 < 2500ms | [ ] |
+| 2 | Alur lengkap: registrasi → login → beli (sandbox) → enrollment → progress → sertifikat | Manual browser + DB verifikasi | Semua langkah berhasil | [ ] |
+| 3 | Matikan container postgres → Uptime Kuma alert | `docker compose stop postgres` lalu cek Uptime Kuma | Alert masuk < 1 menit | [ ] |
+| 4 | Simulasi VM hilang: restore dari backup | `./scripts/restore.sh` di VPS baru | 17 tabel pulih, aplikasi sehat | [ ] |
+| 5 | Webhook pembayaran duplikat | Kirim 2x payload yang sama ke `/api/webhooks/midtrans` | Hanya 1 enrollment (idempoten) | [ ] |
+| 6 | Semua container punya memory limit + healthcheck | `docker compose ps` + `docker stats --no-stream` | Semua Up/healthy, memory limit terlihat | [ ] |
+| 7 | Restart VM → sistem hidup kembali otomatis | `sudo reboot` via SSH, tunggu 2 menit | Semua service auto-start, `/api/health` OK | [ ] |
+| 8 | Pipeline CI/CD hijau | Push commit ke `main` | 3 job sukses | [ ] |
+
+**Cara mengisi checklist:**
+
+- **Item 1:** Jalankan `k6 run scripts/load-test.js` dari laptop, catat hasil p95 katalog.
+- **Item 2:** Login sebagai `siswa@uji.id` di browser, daftar kursus (bila ada yang published), lakukan checkout (Midtrans sandbox), verifikasi enrollment di DB, tandai progress selesai, terbitkan sertifikat, buka `/verify/GLD-...`.
+- **Item 3:** `docker compose stop postgres`, buka `https://monitoring.gladi.id`, tunggu monitor "DB Health" berubah merah.
+- **Item 4:** `./scripts/restore.sh` (sudah diuji di D2 — checklist ulang untuk konfirmasi).
+- **Item 5:** Dua kali POST ke webhook dengan `order_id` yang sama + signature valid → cek DB: hanya 1 enrollment.
+- **Item 6:** `docker compose ps` (semua Up/healthy) + `docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"` (pastikan memory limit tidak tembus).
+- **Item 7:** `sudo reboot` → tunggu 2-3 menit → `curl https://gladi.id/api/health`.
+- **Item 8:** Push commit ini (atau commit apa pun ke `main`) → cek GitHub Actions.
+
+Setelah 8 item checklist tercentang, **Tahap D selesai dan platform siap go-live publik penuh**.
+
+---
