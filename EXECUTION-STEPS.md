@@ -433,7 +433,7 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 | D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ✅ |
 | D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | 🔵 |
 | D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ✅ |
-| D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | 🔵 |
+| D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | ✅ |
 
 ---
 
