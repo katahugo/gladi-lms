@@ -432,8 +432,8 @@ Berhasil go-live pada 23 Jul 2026. Nilai nyata yang dipakai:
 | D1 | Aktifkan backup harian ke Blob (cron) + snapshot mingguan | Backup terjadwal | ✅ |
 | D2 | Uji restore sekali + dokumentasi SOP | SOP restore terbukti | ✅ |
 | D3 | Uptime Kuma monitor + Sentry + alert Azure Monitor | Alert berjalan | 🔵 |
-| D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | 🔵 |
-| D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | ⬜ |
+| D4 | Job BullMQ: rekonsiliasi pembayaran, sertifikat, email | Worker berjalan | ✅ |
+| D5 | Load test ringan + checklist validasi akhir (plan §6) | Sistem tervalidasi | 🔵 |
 
 ---
 
@@ -689,5 +689,5 @@ Setelah itu, buka `https://monitoring.gladi.id` di browser — Uptime Kuma akan 
 
 ---
 
-**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + **CI/CD aktif**: `https://gladi.id`, 23 Jul 2026) → ~~C1–C5~~ ✅ → ~~E1–E4~~ ✅ → **D1–D5 berikutnya** (keandalan — wajib sebelum go-live publik penuh).
-Fitur lengkap sesuai PRD §3: auth, katalog, video, materi, checkout, kuis, sertifikat+verifikasi, forum+rating, dashboard admin/instruktur, kupon, landing page, WhatsApp. Perintah cukup sebutkan kodenya, misal: "kerjakan D1".
+**Progres saat ini:** ~~A1–A8~~ ✅ → ~~B1–B6~~ ✅ (go-live + CI/CD aktif) → ~~C1–C5~~ ✅ → ~~E1–E4~~ ✅ → ~~D1–D4~~ ✅ → **D5 berikutnya** (load test + validasi akhir).
+Fitur lengkap sesuai PRD §3 + keandalan. Perintah cukup sebutkan kodenya, misal: "kerjakan D5".
