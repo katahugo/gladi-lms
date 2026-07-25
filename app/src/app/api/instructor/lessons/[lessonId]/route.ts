@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lessons } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 import { getOwnedLessonContext } from "@/lib/instructor-access";
 
 const LESSON_TYPES = ["video", "text", "quiz", "assignment"] as const;
@@ -17,7 +17,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ lessonId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { lessonId } = await params;
 
   const ctx = await getOwnedLessonContext(lessonId, user);
@@ -119,7 +121,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ lessonId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { lessonId } = await params;
 
   const ctx = await getOwnedLessonContext(lessonId, user);

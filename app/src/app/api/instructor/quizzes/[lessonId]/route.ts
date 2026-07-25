@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { courses, lessons, modules, quizQuestions, quizzes } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 
 /**
  * POST /api/instructor/quizzes/[lessonId] — buat atau ganti kuis pada lesson.
@@ -26,7 +26,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ lessonId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { lessonId } = await params;
 
   let body: unknown;

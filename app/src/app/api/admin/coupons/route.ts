@@ -3,13 +3,14 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { coupons } from "@/db/schema";
-import { requireRole } from "@/lib/guards";
+import { requireApiAdmin } from "@/lib/guards";
 
 /**
  * GET /api/admin/coupons — daftar semua kupon (admin).
  */
 export async function GET() {
-  await requireRole(["admin"]);
+  const authz = await requireApiAdmin();
+  if (!authz.ok) return authz.response;
   const rows = await db.select().from(coupons).orderBy(desc(coupons.createdAt));
   return NextResponse.json({ coupons: rows });
 }
@@ -19,7 +20,8 @@ export async function GET() {
  * Body: { code, discountType: "percent"|"fixed", value, maxUses?, courseId?, expiresAt? }
  */
 export async function POST(req: Request) {
-  await requireRole(["admin"]);
+  const authz = await requireApiAdmin();
+  if (!authz.ok) return authz.response;
 
   let body: unknown;
   try {

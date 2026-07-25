@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { requireRole } from "@/lib/guards";
+import { requireApiAdmin } from "@/lib/guards";
 
 const VALID_ROLES = ["student", "instructor", "admin", "support"] as const;
 
@@ -16,7 +16,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const me = await requireRole(["admin"]);
+  const authz = await requireApiAdmin();
+  if (!authz.ok) return authz.response;
+  const me = authz.user;
   const { id } = await params;
 
   if (id === me.id) {

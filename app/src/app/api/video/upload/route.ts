@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lessons, modules, courses } from "@/db/schema";
 import { getVideoProvider, isVideoConfigured } from "@/lib/video";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 
 /**
  * POST /api/video/upload — minta URL direct-upload Cloudflare Stream.
@@ -16,7 +16,9 @@ import { requireInstructor } from "@/lib/guards";
  * (lihat /api/video/confirm).
  */
 export async function POST(req: Request) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   if (!isVideoConfigured()) {
     return NextResponse.json(
       { error: "Cloudflare Stream belum dikonfigurasi (env CF_STREAM_* belum diisi)" },

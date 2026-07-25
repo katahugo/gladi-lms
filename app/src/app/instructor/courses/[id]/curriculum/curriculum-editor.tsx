@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { MaterialUploader } from "@/components/material-uploader";
 import { QuizBuilder } from "@/components/quiz-builder";
 import { VideoUploader } from "@/components/video-uploader";
+import { readJson } from "@/lib/api-client";
 
 export type CurriculumLesson = {
   id: string;
@@ -35,9 +36,10 @@ const TYPE_LABEL: Record<CurriculumLesson["type"], string> = {
 async function apiJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
-  const data = (await res.json().catch(() => ({}))) as T & { error?: string };
+  const data = await readJson<T & { error?: string }>(res);
   if (!res.ok) throw new Error(data.error ?? `Request gagal (${res.status})`);
   return data;
 }

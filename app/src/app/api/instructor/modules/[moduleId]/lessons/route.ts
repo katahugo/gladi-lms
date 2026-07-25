@@ -3,7 +3,7 @@ import { eq, max } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lessons } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 import { getOwnedModuleContext } from "@/lib/instructor-access";
 
 const LESSON_TYPES = ["video", "text", "quiz", "assignment"] as const;
@@ -16,7 +16,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ moduleId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { moduleId } = await params;
 
   const ctx = await getOwnedModuleContext(moduleId, user);

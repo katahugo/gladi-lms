@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { modules } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 import { getOwnedModuleContext } from "@/lib/instructor-access";
 
 /**
@@ -14,7 +14,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ moduleId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { moduleId } = await params;
 
   const ctx = await getOwnedModuleContext(moduleId, user);
@@ -88,7 +90,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ moduleId: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { moduleId } = await params;
 
   const ctx = await getOwnedModuleContext(moduleId, user);

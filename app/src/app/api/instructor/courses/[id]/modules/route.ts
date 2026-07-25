@@ -3,7 +3,7 @@ import { asc, eq, inArray, max } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lessons, modules } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 import { getOwnedCourse } from "@/lib/instructor-access";
 
 /**
@@ -14,7 +14,9 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { id: courseId } = await params;
 
   const course = await getOwnedCourse(courseId, user);
@@ -50,7 +52,9 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   const { id: courseId } = await params;
 
   const course = await getOwnedCourse(courseId, user);

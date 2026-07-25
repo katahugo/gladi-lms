@@ -2,10 +2,10 @@
 
 import { useRef, useState } from "react";
 
+import { readJson } from "@/lib/api-client";
+
 /**
  * Komponen upload video ke Cloudflare Stream (direct upload TUS).
- * Dipakai instruktur di course builder (Tahap C3 akan mengintegrasikannya
- * ke manajemen modul/materi; saat ini dipakai sebagai komponen mandiri).
  *
  * Alur:
  *   1. POST /api/video/upload  → dapat uploadUrl (TUS) + videoId
@@ -34,24 +34,24 @@ export function VideoUploader({
     setBusy(true);
     setError(null);
     setProgress(0);
+    setDone(false);
 
     try {
-      // 1. Minta direct-upload URL
       const upRes = await fetch("/api/video/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ lessonId, name: file.name }),
       });
+      const upData = await readJson<{ error?: string; uploadUrl?: string; videoId?: string }>(upRes);
       if (!upRes.ok) {
-        const j = (await upRes.json()) as { error?: string };
-        throw new Error(j.error ?? "Gagal meminta URL upload");
+        throw new Error(upData.error ?? "Gagal meminta URL upload");
       }
-      const { uploadUrl, videoId } = (await upRes.json()) as {
-        uploadUrl: string;
-        videoId: string;
-      };
+      const { uploadUrl, videoId } = upData;
+      if (!uploadUrl || !videoId) {
+        throw new Error("Respons upload tidak lengkap");
+      }
 
-      // 2. Upload file via TUS (XMLHttpRequest untuk progress)
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", uploadUrl);
@@ -64,22 +64,27 @@ export function VideoUploader({
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
         };
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload gagal (${xhr.status})`)));
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(`Upload gagal (${xhr.status})`));
         xhr.onerror = () => reject(new Error("Koneksi upload gagal"));
         xhr.send(file);
       });
 
-      // 3. Konfirmasi → simpan videoId ke lesson
       const confRes = await fetch("/api/video/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ lessonId, videoId }),
       });
+      const conf = await readJson<{ error?: string; contentRef?: string }>(confRes);
       if (!confRes.ok) {
-        const j = (await confRes.json()) as { error?: string };
-        throw new Error(j.error ?? "Gagal menyimpan video");
+        throw new Error(conf.error ?? "Gagal menyimpan video");
       }
-      const conf = (await confRes.json()) as { contentRef: string };
+      if (!conf.contentRef) {
+        throw new Error("Konfirmasi berhasil tetapi contentRef kosong");
+      }
 
       setDone(true);
       onDone?.(conf.contentRef);

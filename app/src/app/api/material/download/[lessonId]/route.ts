@@ -3,19 +3,16 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { lessons, modules, courses, enrollments } from "@/db/schema";
-import { isS3Configured, presignDownload } from "@/lib/storage";
+import { courses, enrollments, lessons, modules } from "@/db/schema";
+import { getObject, isS3Configured } from "@/lib/storage";
+
+export const runtime = "nodejs";
 
 /**
- * GET /api/material/download/[lessonId] — signed URL untuk mengunduh materi lesson.
+ * GET /api/material/download/[lessonId] — stream materi lewat app (proxy MinIO).
  *
- * Kontrol akses (sama seperti video playback):
- *   - lesson.isFreePreview = true  → boleh siapa pun
- *   - instruktur pemilik / admin   → boleh
- *   - siswa dengan enrollment aktif → boleh
- *   - selain itu                   → 403
- *
- * Materi disimpan sebagai object key di lessons.contentRef (prefix "s3:").
+ * Tidak memakai signed URL ke host internal `minio:9000` karena browser
+ * tidak bisa menjangkaunya.
  */
 export async function GET(
   _req: Request,
@@ -61,10 +58,24 @@ export async function GET(
   }
 
   try {
-    const downloadUrl = await presignDownload(key);
-    return NextResponse.json({ downloadUrl, filename: key.split("/").pop() });
+    const obj = await getObject(key);
+    const body = obj.Body;
+    if (!body) {
+      return NextResponse.json({ error: "File kosong di storage" }, { status: 404 });
+    }
+
+    const filename = key.split("/").pop() ?? "materi";
+    const stream = body.transformToWebStream();
+    return new NextResponse(stream, {
+      headers: {
+        "Content-Type": obj.ContentType ?? "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename.replace(/"/g, "")}"`,
+        ...(obj.ContentLength != null ? { "Content-Length": String(obj.ContentLength) } : {}),
+        "Cache-Control": "private, max-age=60",
+      },
+    });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Gagal membuat download URL";
+    const msg = err instanceof Error ? err.message : "Gagal mengunduh materi";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

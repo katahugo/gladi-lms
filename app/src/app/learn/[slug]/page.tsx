@@ -104,9 +104,24 @@ export default async function LearnPage({
               </div>
               {activeLesson.type === "video" && activeLesson.contentRef?.startsWith("cf:") ? (
                 <VideoPlayer lessonId={activeLesson.id} title={activeLesson.title} />
-              ) : activeLesson.type === "text" && activeLesson.contentBody ? (
-                <div className="prose prose-invert max-w-none rounded-xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-300">
-                  {activeLesson.contentBody}
+              ) : activeLesson.type === "text" || activeLesson.type === "assignment" ? (
+                <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+                  {activeLesson.contentBody ? (
+                    <div className="prose prose-invert max-w-none whitespace-pre-wrap text-zinc-300">
+                      {activeLesson.contentBody}
+                    </div>
+                  ) : null}
+                  {activeLesson.contentRef?.startsWith("s3:") ? (
+                    <a
+                      href={`/api/material/download/${activeLesson.id}`}
+                      className="inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                    >
+                      Unduh materi
+                    </a>
+                  ) : null}
+                  {!activeLesson.contentBody && !activeLesson.contentRef?.startsWith("s3:") ? (
+                    <p className="text-zinc-500">Konten belum tersedia untuk materi ini.</p>
+                  ) : null}
                 </div>
               ) : activeLesson.type === "quiz" ? (
                 <QuizPanel lessonId={activeLesson.id} />
