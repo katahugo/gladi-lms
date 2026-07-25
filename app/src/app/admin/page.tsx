@@ -490,7 +490,7 @@ export default async function AdminDashboard() {
           </div>
           <div className="absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           <Link
-            href="/instructor/courses"
+            href="/admin/courses"
             className="mt-8 self-start rounded-lg bg-white px-4 py-2 text-label-md font-bold text-primary transition-transform active:scale-95"
           >
             Kelola Program

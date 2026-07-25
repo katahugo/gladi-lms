@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AdminNavLink } from "@/components/admin-nav-link";
 
 const NAV = [
   { href: "/admin", label: "Ringkasan", icon: "dashboard", exact: true },
-  { href: "/instructor/courses", label: "Kursus", icon: "menu_book" },
+  { href: "/admin/courses", label: "Kursus", icon: "menu_book" },
   { href: "/admin/users", label: "Pengguna", icon: "group" },
   { href: "/admin/transactions", label: "Pendapatan", icon: "payments" },
   { href: "/admin#kesehatan", label: "Kesehatan Sistem", icon: "analytics", exact: true },
@@ -24,12 +25,22 @@ type AdminShellProps = {
   logoutAction: () => Promise<void>;
 };
 
+function headerTitle(pathname: string): string {
+  if (pathname.startsWith("/admin/courses")) return "Dashboard / Kursus";
+  if (pathname.startsWith("/admin/users")) return "Dashboard / Pengguna";
+  if (pathname.startsWith("/admin/transactions")) return "Dashboard / Pendapatan";
+  if (pathname.startsWith("/admin/coupons")) return "Dashboard / Pengaturan";
+  return "Dashboard Gladi.ID";
+}
+
 /**
  * Shell admin: sidebar + top bar sesuai mockup Admin LMS.
  */
 export function AdminShell({ children, user, logoutAction }: AdminShellProps) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const displayName = user.name?.trim() || "Admin Utama";
+  const isHome = pathname === "/admin";
   const avatar =
     user.image ||
     "https://lh3.googleusercontent.com/aida-public/AB6AXuBCrNcGd_Z3VIzyrOmEvE_F6aijtNt7kJblaPmNrP3Z3LR0bhMdqbLqgjoE_fnpM9IJiFtg9cytEE2hRy2DkrnX-egM13FnKCC9cWHrj07bDA59TmAAdiOlMJkS1FsSmik14JDiSrBAMbZflZ-MrUA_faK6RcVBQnMqezx2jmDttv1QdNmRdMsEmfcrCk0p-EPh5ExM3awJFGaHx-4vzPmXZAaj0LtjHfaPHSGf4uhUnRLQzhLJ81PL25vfYhYCcmXL2wdxxu3o8g4";
@@ -113,19 +124,25 @@ export function AdminShell({ children, user, logoutAction }: AdminShellProps) {
             >
               <span className="material-symbols-outlined">menu</span>
             </button>
-            <h1 className="font-headline text-headline-md font-bold text-primary">
-              Dashboard Gladi.ID
+            <h1
+              className={`font-headline ${
+                isHome
+                  ? "text-headline-md font-bold text-primary"
+                  : "hidden text-label-md text-on-surface-variant md:block"
+              }`}
+            >
+              {headerTitle(pathname)}
             </h1>
           </div>
 
           <div className="flex items-center gap-unit-6">
-            <div className="hidden items-center rounded-full border border-outline-variant bg-surface-container px-4 py-2 transition-all focus-within:border-primary lg:flex">
+            <div className="hidden items-center rounded-full border border-outline-variant bg-surface-container px-4 py-2 transition-all focus-within:border-primary sm:flex">
               <span className="material-symbols-outlined text-sm text-on-surface-variant">
                 search
               </span>
               <input
                 className="w-48 border-none bg-transparent text-label-md text-on-surface outline-none focus:ring-0"
-                placeholder="Cari data..."
+                placeholder="Cari apa saja..."
                 type="search"
                 aria-label="Cari data"
               />
@@ -138,6 +155,13 @@ export function AdminShell({ children, user, logoutAction }: AdminShellProps) {
               >
                 <span className="material-symbols-outlined">notifications</span>
                 <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-error" />
+              </button>
+              <button
+                type="button"
+                className="text-on-surface-variant transition-colors hover:text-primary"
+                aria-label="Bantuan"
+              >
+                <span className="material-symbols-outlined">help</span>
               </button>
               <Link
                 href="/admin/coupons"
@@ -165,18 +189,69 @@ export function AdminShell({ children, user, logoutAction }: AdminShellProps) {
           </div>
         </header>
 
-        <div className="mt-16 flex-1">{children}</div>
+        <div className="mt-16 flex-1 pb-20 md:pb-0">{children}</div>
       </main>
 
       <Link
         href="/instructor/courses/new"
-        className="group fixed right-8 bottom-8 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:scale-110 active:scale-95"
+        className="group fixed right-8 bottom-8 z-50 hidden h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:scale-110 active:scale-95 md:flex"
         aria-label="Buat kursus baru"
       >
         <span className="material-symbols-outlined transition-transform group-hover:rotate-90">
           add
         </span>
       </Link>
+
+      {/* Mobile bottom nav */}
+      <nav className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around bg-surface px-unit-4 py-unit-3 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden">
+        <Link href="/admin" className="flex flex-col items-center gap-1 text-on-surface-variant">
+          <span className="material-symbols-outlined">dashboard</span>
+          <span className="text-[10px] font-medium">Beranda</span>
+        </Link>
+        <Link
+          href="/admin/courses"
+          className={`flex flex-col items-center gap-1 ${
+            pathname.startsWith("/admin/courses") ? "text-primary" : "text-on-surface-variant"
+          }`}
+        >
+          <span
+            className="material-symbols-outlined"
+            style={
+              pathname.startsWith("/admin/courses")
+                ? { fontVariationSettings: "'FILL' 1" }
+                : undefined
+            }
+          >
+            auto_stories
+          </span>
+          <span
+            className={`text-[10px] ${pathname.startsWith("/admin/courses") ? "font-bold" : "font-medium"}`}
+          >
+            Kursus
+          </span>
+        </Link>
+        <Link
+          href="/instructor/courses/new"
+          className="-mt-8 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg"
+          aria-label="Tambah kursus"
+        >
+          <span className="material-symbols-outlined">add</span>
+        </Link>
+        <Link
+          href="/admin/transactions"
+          className="flex flex-col items-center gap-1 text-on-surface-variant"
+        >
+          <span className="material-symbols-outlined">analytics</span>
+          <span className="text-[10px] font-medium">Laporan</span>
+        </Link>
+        <Link
+          href="/admin/coupons"
+          className="flex flex-col items-center gap-1 text-on-surface-variant"
+        >
+          <span className="material-symbols-outlined">settings</span>
+          <span className="text-[10px] font-medium">Pengaturan</span>
+        </Link>
+      </nav>
     </div>
   );
 }

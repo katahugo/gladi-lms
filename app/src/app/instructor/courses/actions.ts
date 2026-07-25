@@ -63,6 +63,7 @@ export async function createCourse(
     .returning({ id: courses.id });
 
   revalidatePath("/instructor/courses");
+  revalidatePath("/admin/courses");
   redirect(`/instructor/courses/${created.id}/curriculum`);
 }
 
@@ -135,6 +136,7 @@ export async function setCourseStatus(
     .where(eq(courses.id, courseId));
 
   revalidatePath("/instructor/courses");
+  revalidatePath("/admin/courses");
   revalidatePath("/courses");
   revalidatePath(`/courses/${existing.slug}`);
   return {};
@@ -148,5 +150,6 @@ export async function deleteCourse(courseId: string) {
 
   await db.delete(courses).where(eq(courses.id, courseId));
   revalidatePath("/instructor/courses");
+  revalidatePath("/admin/courses");
   revalidatePath("/courses");
 }
