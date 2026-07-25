@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -61,12 +60,7 @@ export default async function AdminDashboard() {
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-white">User Terbaru</h2>
-            <Link href="/admin/users" className="text-xs text-emerald-400 hover:underline">
-              Kelola semua
-            </Link>
-          </div>
+          <h2 className="mb-3 font-semibold text-white">User Terbaru</h2>
           {recentUsers.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada user.</p>
           ) : (
@@ -84,12 +78,7 @@ export default async function AdminDashboard() {
         </section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-white">Transaksi Terkini</h2>
-            <Link href="/admin/transactions" className="text-xs text-emerald-400 hover:underline">
-              Lihat semua
-            </Link>
-          </div>
+          <h2 className="mb-3 font-semibold text-white">Transaksi Terkini</h2>
           {recentTx.length === 0 ? (
             <p className="text-sm text-zinc-500">Belum ada transaksi.</p>
           ) : (

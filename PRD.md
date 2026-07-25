@@ -42,11 +42,13 @@ Sama seperti v1.0 — tidak ada perubahan fitur, hanya perubahan infrastruktur. 
 - Sertifikat otomatis + halaman verifikasi publik
 - Pembayaran (Midtrans/Xendit — QRIS, e-wallet, transfer bank, kartu kredit)
 - Forum diskusi & rating kursus
-- Dashboard admin & instruktur + laporan
 - Notifikasi email (+ opsional WhatsApp)
 - SEO & landing page promosi
-
-*(Detail lengkap tiap fitur mengikuti PRD v1.0 — tidak diulang di sini agar dokumen fokus pada perubahan arsitektur.)*
+- **Dashboard Admin** — statistik global platform (total user, kursus, enrollment, sertifikat, pendapatan, transaksi pending), daftar user terbaru, daftar transaksi terkini, sidebar navigasi ke sub-halaman manajemen
+- **Manajemen User** — tabel semua user dengan dropdown ubah role (student/instructor/admin/support), admin tidak bisa mengubah role sendiri
+- **Manajemen Transaksi** — tabel transaksi (order ref, kursus, user, jumlah, metode pembayaran, status, waktu) untuk rekonsiliasi dan support
+- **Manajemen Kupon** — form buat kupon diskon (kode, tipe percent/fixed, nilai, maxUses, kedaluwarsa), daftar kupon dengan toggle aktif/nonaktif dan hapus
+- **Dashboard Instruktur** — statistik kursus milik instruktur (total kursus, enrollment, pendapatan, sertifikat), daftar kursus terbaru, pendaftaran terkini, halaman progres siswa per kursus
 
 ---
 
