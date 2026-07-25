@@ -191,6 +191,32 @@
   }
 }
 
+.tech-shadow {
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+}
+
+.card-emerald-glow {
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.card-emerald-glow:hover {
+  border-color: #00d084;
+  box-shadow: 0 0 15px rgba(0, 208, 132, 0.15);
+  transform: translateY(-4px);
+}
+
+.progress-gradient {
+  background: linear-gradient(90deg, #00d084 0%, #31e193 100%);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+}
+
 select.catalog-select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%233c4a40'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");

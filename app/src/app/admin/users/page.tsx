@@ -26,12 +26,14 @@ export default async function AdminUsersPage() {
     .orderBy(desc(users.createdAt));
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
-      <h1 className="mb-8 text-2xl font-bold text-white">Manajemen User ({rows.length})</h1>
+    <div className="mx-auto max-w-5xl p-6 md:p-margin-desktop">
+      <h1 className="mb-8 font-headline text-headline-md font-bold text-primary">
+        Manajemen User ({rows.length})
+      </h1>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      <div className="tech-shadow overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-zinc-800 bg-zinc-900 text-xs uppercase text-zinc-500">
+          <thead className="border-b border-outline-variant bg-surface-container text-[11px] tracking-widest text-on-surface-variant uppercase">
             <tr>
               <th className="px-4 py-3">Nama</th>
               <th className="px-4 py-3">Email</th>
@@ -39,15 +41,15 @@ export default async function AdminUsersPage() {
               <th className="px-4 py-3">Terdaftar</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800 bg-zinc-950">
+          <tbody className="divide-y divide-outline-variant/30">
             {rows.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-3 text-white">{u.name ?? "-"}</td>
-                <td className="px-4 py-3 text-zinc-400">{u.email}</td>
+              <tr key={u.id} className="hover:bg-surface-container/30">
+                <td className="px-4 py-3 font-medium text-on-surface">{u.name ?? "-"}</td>
+                <td className="px-4 py-3 text-on-surface-variant">{u.email}</td>
                 <td className="px-4 py-3">
                   <UserRoleSelect userId={u.id} currentRole={u.role} isSelf={u.id === me.id} />
                 </td>
-                <td className="px-4 py-3 text-zinc-500">
+                <td className="px-4 py-3 text-on-surface-variant">
                   {new Date(u.createdAt).toLocaleDateString("id-ID")}
                 </td>
               </tr>

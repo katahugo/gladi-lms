@@ -84,22 +84,22 @@ export default function AdminCouponsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="mb-8 text-2xl font-bold text-white">Kupon Diskon</h1>
+    <div className="mx-auto max-w-4xl p-6 md:p-margin-desktop">
+      <h1 className="mb-8 font-headline text-headline-md font-bold text-primary">Kupon Diskon</h1>
 
-      <div className="mb-8 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-        <h2 className="mb-3 font-semibold text-white">Buat Kupon Baru</h2>
+      <div className="tech-shadow mb-8 rounded-xl border border-outline-variant bg-surface-container-lowest p-5">
+        <h2 className="mb-3 font-headline font-semibold text-on-surface">Buat Kupon Baru</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
             placeholder="KODE (mis. PROMO50)"
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 font-mono uppercase text-white outline-none focus:border-emerald-500"
+            className="rounded-md border border-outline-variant bg-surface-container px-3 py-2 font-mono uppercase text-on-surface outline-none focus:border-primary"
           />
           <select
             value={form.discountType}
             onChange={(e) => setForm({ ...form, discountType: e.target.value as "percent" })}
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white"
+            className="rounded-md border border-outline-variant bg-surface-container px-3 py-2 text-on-surface"
           >
             <option value="percent">Persen (%)</option>
             <option value="fixed">Nominal (Rp)</option>
@@ -109,47 +109,51 @@ export default function AdminCouponsPage() {
             onChange={(e) => setForm({ ...form, value: e.target.value.replace(/[^\d]/g, "") })}
             placeholder={form.discountType === "percent" ? "Nilai % (1-100)" : "Nominal Rupiah"}
             inputMode="numeric"
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
+            className="rounded-md border border-outline-variant bg-surface-container px-3 py-2 text-on-surface outline-none focus:border-primary"
           />
           <input
             value={form.maxUses}
             onChange={(e) => setForm({ ...form, maxUses: e.target.value.replace(/[^\d]/g, "") })}
             placeholder="Maks pemakaian (opsional)"
             inputMode="numeric"
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
+            className="rounded-md border border-outline-variant bg-surface-container px-3 py-2 text-on-surface outline-none focus:border-primary"
           />
           <input
             type="date"
             value={form.expiresAt}
             onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
-            className="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
+            className="rounded-md border border-outline-variant bg-surface-container px-3 py-2 text-on-surface outline-none focus:border-primary"
           />
         </div>
-        {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+        {error && <p className="mt-2 text-xs text-error">{error}</p>}
         <button
           onClick={create}
           disabled={busy || !form.code.trim() || !form.value}
-          className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:opacity-90 disabled:opacity-50"
         >
           {busy ? "Membuat..." : "Buat Kupon"}
         </button>
       </div>
 
       {loading ? (
-        <p className="text-zinc-500">Memuat...</p>
+        <p className="text-on-surface-variant">Memuat...</p>
       ) : rows.length === 0 ? (
-        <p className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-400">
+        <p className="tech-shadow rounded-xl border border-outline-variant bg-surface-container-lowest p-8 text-center text-on-surface-variant">
           Belum ada kupon.
         </p>
       ) : (
         <ul className="space-y-2">
           {rows.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <li
+              key={c.id}
+              className="tech-shadow flex flex-wrap items-center justify-between gap-3 rounded-xl border border-outline-variant bg-surface-container-lowest p-4"
+            >
               <div>
-                <p className="font-mono font-bold text-white">{c.code}</p>
-                <p className="text-xs text-zinc-500">
-                  {c.discountType === "percent" ? `${c.value}%` : formatRupiah(c.value)} ·
-                  terpakai {c.usedCount}{c.maxUses ? `/${c.maxUses}` : ""}
+                <p className="font-mono font-bold text-on-surface">{c.code}</p>
+                <p className="text-xs text-on-surface-variant">
+                  {c.discountType === "percent" ? `${c.value}%` : formatRupiah(c.value)} · terpakai{" "}
+                  {c.usedCount}
+                  {c.maxUses ? `/${c.maxUses}` : ""}
                   {c.expiresAt && ` · s.d. ${new Date(c.expiresAt).toLocaleDateString("id-ID")}`}
                 </p>
               </div>
@@ -158,15 +162,15 @@ export default function AdminCouponsPage() {
                   onClick={() => toggle(c.id, c.isActive)}
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
                     c.isActive
-                      ? "bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30"
-                      : "bg-zinc-600/30 text-zinc-400 hover:bg-zinc-600/50"
+                      ? "bg-primary-container/40 text-on-primary-container hover:bg-primary-container/60"
+                      : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
                   {c.isActive ? "Aktif" : "Nonaktif"}
                 </button>
                 <button
                   onClick={() => remove(c.id)}
-                  className="rounded-md bg-red-600/20 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-600/30"
+                  className="rounded-md bg-error-container px-3 py-1.5 text-xs font-semibold text-on-error-container hover:opacity-90"
                 >
                   Hapus
                 </button>

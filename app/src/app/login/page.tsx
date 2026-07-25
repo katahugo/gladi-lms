@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthError } from "next-auth";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { signIn } from "@/auth";
 import { PasswordField } from "@/components/password-field";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { homePathForRole } from "@/lib/home-path";
 
 export const dynamic = "force-dynamic";
 
@@ -39,11 +43,23 @@ export default function LoginPage({
   async function loginCredentials(formData: FormData) {
     "use server";
     const params = await searchParams;
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    let role: string | undefined;
+    try {
+      const row = await db.query.users.findFirst({
+        where: eq(users.email, email),
+        columns: { role: true },
+      });
+      role = row?.role;
+    } catch {
+      // DB down — fallback ke /dashboard; redirect role tetap di-handle di /dashboard
+    }
+    const redirectTo = homePathForRole(role, params.callbackUrl);
     try {
       await signIn("credentials", {
         email: formData.get("email"),
         password: formData.get("password"),
-        redirectTo: params.callbackUrl ?? "/dashboard",
+        redirectTo,
       });
     } catch (error) {
       if (error instanceof AuthError) {
@@ -59,7 +75,10 @@ export default function LoginPage({
   async function loginGoogle() {
     "use server";
     const params = await searchParams;
-    await signIn("google", { redirectTo: params.callbackUrl ?? "/dashboard" });
+    // Role Google baru diketahui setelah OAuth — /dashboard akan redirect admin/instructor.
+    await signIn("google", {
+      redirectTo: params.callbackUrl ?? "/dashboard",
+    });
   }
 
   const year = new Date().getFullYear();

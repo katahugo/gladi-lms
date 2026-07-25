@@ -112,8 +112,11 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user) redirect("/login?callbackUrl=/dashboard");
 
+  // Admin/instruktur punya panel sendiri — jangan tampilkan dashboard siswa.
+  if (session.user.role === "admin") redirect("/admin");
+  if (session.user.role === "instructor") redirect("/instructor/dashboard");
+
   const userId = session.user.id;
-  const role = session.user.role;
   const displayName = session.user.name?.trim() || "Siswa";
   const firstName = displayName.split(/\s+/)[0] ?? displayName;
 
@@ -269,25 +272,6 @@ export default async function DashboardPage() {
               <span className="material-symbols-outlined">history</span>
               <span className="font-headline text-label-md">Riwayat Belajar</span>
             </Link>
-
-            {(role === "instructor" || role === "admin") && (
-              <Link
-                href="/instructor/dashboard"
-                className="mt-2 flex items-center gap-3 rounded-lg px-4 py-3 text-on-surface-variant transition-all hover:bg-surface-container-high"
-              >
-                <span className="material-symbols-outlined">school</span>
-                <span className="font-headline text-label-md">Panel Instruktur</span>
-              </Link>
-            )}
-            {role === "admin" && (
-              <Link
-                href="/admin"
-                className="flex items-center gap-3 rounded-lg px-4 py-3 text-on-surface-variant transition-all hover:bg-surface-container-high"
-              >
-                <span className="material-symbols-outlined">admin_panel_settings</span>
-                <span className="font-headline text-label-md">Panel Admin</span>
-              </Link>
-            )}
           </nav>
 
           <div className="border-t border-outline-variant pt-6">

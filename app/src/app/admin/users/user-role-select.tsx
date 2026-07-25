@@ -46,7 +46,7 @@ export function UserRoleSelect({
         value={role}
         onChange={(e) => change(e.target.value)}
         disabled={busy || isSelf}
-        className="rounded-md border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-white disabled:opacity-50"
+        className="rounded-md border border-outline-variant bg-surface-container px-2 py-1 text-xs text-on-surface disabled:opacity-50"
         title={isSelf ? "Tidak bisa mengubah role sendiri" : undefined}
       >
         {ROLES.map((r) => (
@@ -55,7 +55,7 @@ export function UserRoleSelect({
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-[10px] text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-[10px] text-error">{error}</p>}
     </div>
   );
 }

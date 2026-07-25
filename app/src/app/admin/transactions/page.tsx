@@ -33,12 +33,14 @@ export default async function AdminTransactionsPage() {
     .limit(100);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
-      <h1 className="mb-8 text-2xl font-bold text-white">Transaksi ({rows.length} terbaru)</h1>
+    <div className="mx-auto max-w-6xl p-6 md:p-margin-desktop">
+      <h1 className="mb-8 font-headline text-headline-md font-bold text-primary">
+        Transaksi ({rows.length} terbaru)
+      </h1>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+      <div className="tech-shadow overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-lowest">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-zinc-800 bg-zinc-900 text-xs uppercase text-zinc-500">
+          <thead className="border-b border-outline-variant bg-surface-container text-[11px] tracking-widest text-on-surface-variant uppercase">
             <tr>
               <th className="px-4 py-3">Order Ref</th>
               <th className="px-4 py-3">Kursus</th>
@@ -49,18 +51,18 @@ export default async function AdminTransactionsPage() {
               <th className="px-4 py-3">Waktu</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800 bg-zinc-950">
+          <tbody className="divide-y divide-outline-variant/30">
             {rows.map((t) => (
-              <tr key={t.id}>
-                <td className="px-4 py-3 font-mono text-xs text-zinc-400">{t.ref}</td>
-                <td className="px-4 py-3 text-white">{t.courseTitle ?? "-"}</td>
-                <td className="px-4 py-3 text-zinc-400">{t.userEmail}</td>
-                <td className="px-4 py-3 text-white">{formatRupiah(t.amount)}</td>
-                <td className="px-4 py-3 text-zinc-400">{t.method ?? "-"}</td>
+              <tr key={t.id} className="hover:bg-surface-container/30">
+                <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">{t.ref}</td>
+                <td className="px-4 py-3 font-medium text-on-surface">{t.courseTitle ?? "-"}</td>
+                <td className="px-4 py-3 text-on-surface-variant">{t.userEmail}</td>
+                <td className="px-4 py-3 font-medium text-on-surface">{formatRupiah(t.amount)}</td>
+                <td className="px-4 py-3 text-on-surface-variant">{t.method ?? "-"}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={t.status} />
                 </td>
-                <td className="px-4 py-3 text-xs text-zinc-500">
+                <td className="px-4 py-3 text-xs text-on-surface-variant">
                   {new Date(t.createdAt).toLocaleString("id-ID")}
                 </td>
               </tr>
@@ -74,14 +76,16 @@ export default async function AdminTransactionsPage() {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    paid: "bg-emerald-600/20 text-emerald-400",
-    pending: "bg-amber-600/20 text-amber-400",
-    failed: "bg-red-600/20 text-red-400",
-    expired: "bg-zinc-600/20 text-zinc-400",
-    refunded: "bg-sky-600/20 text-sky-400",
+    paid: "bg-primary-container/40 text-on-primary-container",
+    pending: "bg-tertiary-container/50 text-on-tertiary-container",
+    failed: "bg-error-container text-on-error-container",
+    expired: "bg-surface-container text-on-surface-variant",
+    refunded: "bg-secondary-container text-on-secondary-container",
   };
   return (
-    <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${map[status] ?? map.pending}`}>
+    <span
+      className={`rounded px-2 py-0.5 text-[10px] font-semibold ${map[status] ?? map.pending}`}
+    >
       {status}
     </span>
   );
