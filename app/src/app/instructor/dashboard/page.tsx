@@ -93,8 +93,11 @@ export default async function InstructorDashboard() {
                       {c.status} · {formatRupiah(c.price)}
                     </p>
                   </div>
-                  <Link href={`/instructor/courses/${c.id}/edit`} className="text-xs text-emerald-400 hover:underline">
-                    Edit
+                  <Link
+                    href={`/instructor/courses/${c.id}/curriculum`}
+                    className="text-xs text-emerald-400 hover:underline"
+                  >
+                    Kurikulum
                   </Link>
                 </li>
               ))}

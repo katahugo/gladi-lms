@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, ne } from "drizzle-orm";
+import { and, count, eq, inArray, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { courses } from "@/db/schema";
+import { courses, lessons, modules } from "@/db/schema";
 import { requireInstructor } from "@/lib/guards";
 import { slugify } from "@/lib/courses";
 
@@ -49,18 +49,21 @@ export async function createCourse(
   if ("error" in parsed) return { error: parsed.error };
 
   const slug = await uniqueSlug(parsed.title);
-  await db.insert(courses).values({
-    instructorId: user.id,
-    title: parsed.title,
-    slug,
-    description: parsed.description || null,
-    category: parsed.category || null,
-    price: parsed.price,
-    status: "draft",
-  });
+  const [created] = await db
+    .insert(courses)
+    .values({
+      instructorId: user.id,
+      title: parsed.title,
+      slug,
+      description: parsed.description || null,
+      category: parsed.category || null,
+      price: parsed.price,
+      status: "draft",
+    })
+    .returning({ id: courses.id });
 
   revalidatePath("/instructor/courses");
-  redirect("/instructor/courses");
+  redirect(`/instructor/courses/${created.id}/curriculum`);
 }
 
 export async function updateCourse(
@@ -97,11 +100,34 @@ export async function updateCourse(
   redirect("/instructor/courses");
 }
 
-export async function setCourseStatus(courseId: string, status: "draft" | "published" | "archived") {
+export async function setCourseStatus(
+  courseId: string,
+  status: "draft" | "published" | "archived",
+): Promise<{ error?: string }> {
   const user = await requireInstructor();
   const existing = await db.query.courses.findFirst({ where: eq(courses.id, courseId) });
-  if (!existing) return;
-  if (user.role !== "admin" && existing.instructorId !== user.id) return;
+  if (!existing) return { error: "Kursus tidak ditemukan" };
+  if (user.role !== "admin" && existing.instructorId !== user.id) {
+    return { error: "Anda bukan pemilik kursus ini" };
+  }
+
+  if (status === "published") {
+    const mods = await db
+      .select({ id: modules.id })
+      .from(modules)
+      .where(eq(modules.courseId, courseId));
+    const moduleIds = mods.map((m) => m.id);
+    if (moduleIds.length === 0) {
+      return { error: "Tambahkan minimal 1 modul & 1 materi sebelum menerbitkan" };
+    }
+    const [lessonAgg] = await db
+      .select({ total: count(lessons.id) })
+      .from(lessons)
+      .where(inArray(lessons.moduleId, moduleIds));
+    if (Number(lessonAgg?.total ?? 0) < 1) {
+      return { error: "Tambahkan minimal 1 materi sebelum menerbitkan" };
+    }
+  }
 
   await db
     .update(courses)
@@ -111,6 +137,7 @@ export async function setCourseStatus(courseId: string, status: "draft" | "publi
   revalidatePath("/instructor/courses");
   revalidatePath("/courses");
   revalidatePath(`/courses/${existing.slug}`);
+  return {};
 }
 
 export async function deleteCourse(courseId: string) {
