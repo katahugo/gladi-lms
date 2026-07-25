@@ -8,6 +8,7 @@ Platform LMS production-grade untuk menjual kursus digital, dibangun dan di-depl
 
 ## Daftar Isi
 
+- [Akun Admin](#akun-admin)
 - [Fitur](#fitur)
 - [Arsitektur](#arsitektur)
 - [Tech Stack](#tech-stack)
@@ -18,6 +19,38 @@ Platform LMS production-grade untuk menjual kursus digital, dibangun dan di-depl
 - [Deployment](#deployment)
 - [Operasional](#operasional)
 - [Dokumentasi Terkait](#dokumentasi-terkait)
+
+---
+
+## Akun Admin
+
+Endpoint registrasi (`/api/register`) hanya membuat akun dengan role **student** (by design — pengangkatan role adalah wewenang admin). Untuk membuat user admin pertama, gunakan skrip `create-admin.sh` di VPS:
+
+```bash
+cd ~/gladi-lms
+./scripts/create-admin.sh admin@email.com "Nama Admin" "password-kuat-min-8"
+```
+
+**Cara kerja skrip:**
+1. Mengecek apakah email sudah terdaftar
+2. Jika sudah → mengubah role menjadi `admin` (promosi dari student/instructor)
+3. Jika belum → membuat user baru langsung di database dengan password yang di-hash bcrypt
+
+**Setelah dibuat:**
+- Login di [`https://gladi.id/login`](https://gladi.id/login) dengan email dan password admin
+- Akses dashboard admin: [`https://gladi.id/admin`](https://gladi.id/admin)
+- Dari dashboard admin, Anda bisa mengelola user (ubah role), transaksi, dan kupon
+
+**Login sebagai admin:**
+
+| Langkah | Keterangan |
+|---|---|
+| 1. Buka [`https://gladi.id/login`](https://gladi.id/login) | Halaman login Gladi LMS |
+| 2. Isi email dan password admin | Kredensial dari `create-admin.sh` |
+| 3. Klik **Masuk** | Redirect ke `/dashboard` |
+| 4. Buka [`/admin`](https://gladi.id/admin) | Dashboard admin (statistik global, user, transaksi, kupon) |
+
+> **Catatan:** Jika Anda sudah punya akun dengan role lain (student/instructor), cukup jalankan `create-admin.sh` dengan email yang sama — skrip akan mempromosikan role-nya menjadi admin tanpa membuat akun baru.
 
 ---
 
@@ -164,6 +197,7 @@ gladi-lms/
 │   ├── deploy.sh          # Deploy dengan rollback
 │   ├── backup.sh          # Backup harian
 │   ├── restore.sh         # Restore dari backup
+│   ├── create-admin.sh    # Buat user admin
 │   ├── setup-backup.sh    # Aktivasi backup
 │   ├── provision-monitoring-ssl.sh  # SSL monitoring
 │   └── load-test.js       # Load test k6
