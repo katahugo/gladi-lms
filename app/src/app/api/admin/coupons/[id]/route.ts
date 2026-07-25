@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { coupons } from "@/db/schema";
-import { requireRole } from "@/lib/guards";
+import { requireApiAdmin } from "@/lib/guards";
 
 /**
  * PATCH /api/admin/coupons/[id] — aktif/nonaktifkan atau edit kupon.
@@ -13,7 +13,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireRole(["admin"]);
+  const authz = await requireApiAdmin();
+  if (!authz.ok) return authz.response;
   const { id } = await params;
 
   let body: unknown;
@@ -38,7 +39,8 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  await requireRole(["admin"]);
+  const authz = await requireApiAdmin();
+  if (!authz.ok) return authz.response;
   const { id } = await params;
   await db.delete(coupons).where(eq(coupons.id, id));
   return NextResponse.json({ ok: true });

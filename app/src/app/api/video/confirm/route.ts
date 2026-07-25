@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { lessons, modules, courses } from "@/db/schema";
 import { getVideoProvider, isVideoConfigured } from "@/lib/video";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 
 /**
  * POST /api/video/confirm — konfirmasi upload selesai, simpan video UID.
@@ -15,7 +15,9 @@ import { requireInstructor } from "@/lib/guards";
  * penyedianya) dan mengubah tipe lesson menjadi video.
  */
 export async function POST(req: Request) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
   if (!isVideoConfigured()) {
     return NextResponse.json({ error: "Cloudflare Stream belum dikonfigurasi" }, { status: 503 });
   }

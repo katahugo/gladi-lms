@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lessons, modules, courses } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
+import { requireApiInstructor } from "@/lib/guards";
 import { isS3Configured } from "@/lib/storage";
 
 /**
@@ -13,7 +13,10 @@ import { isS3Configured } from "@/lib/storage";
  * Menyimpan key ke lessons.contentRef dengan prefix "s3:".
  */
 export async function POST(req: Request) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
+
   if (!isS3Configured()) {
     return NextResponse.json({ error: "MinIO/S3 belum dikonfigurasi" }, { status: 503 });
   }

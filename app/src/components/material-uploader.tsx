@@ -2,12 +2,14 @@
 
 import { useRef, useState } from "react";
 
+import { readJson } from "@/lib/api-client";
+
 /**
- * Komponen upload materi (PDF/gambar/dokumen) ke MinIO via signed URL.
- * Alur:
- *   1. POST /api/material/upload-url → dapat uploadUrl (PUT) + key
- *   2. PUT file langsung ke MinIO via signed URL
- *   3. POST /api/material/confirm → simpan key ke lesson
+ * Upload materi ke MinIO via proxy API app (bukan signed URL langsung).
+ * Alur: POST multipart /api/material/upload → simpan contentRef di lesson.
+ *
+ * Catatan: browser tidak bisa menjangkau MinIO internal (http://minio:9000),
+ * jadi upload harus lewat Next.js API.
  */
 export function MaterialUploader({
   lessonId,
@@ -29,42 +31,28 @@ export function MaterialUploader({
     }
     setBusy(true);
     setError(null);
+    setDone(false);
 
     try {
-      // 1. Minta signed URL upload
-      const upRes = await fetch("/api/material/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lessonId, filename: file.name, contentType: file.type }),
-      });
-      if (!upRes.ok) {
-        const j = (await upRes.json()) as { error?: string };
-        throw new Error(j.error ?? "Gagal meminta URL upload");
-      }
-      const { uploadUrl, key } = (await upRes.json()) as { uploadUrl: string; key: string };
+      const form = new FormData();
+      form.set("lessonId", lessonId);
+      form.set("file", file);
 
-      // 2. PUT file langsung ke MinIO via signed URL
-      const putRes = await fetch(uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload ke storage gagal (${putRes.status})`);
-
-      // 3. Konfirmasi simpan key ke lesson
-      const confRes = await fetch("/api/material/confirm", {
+      const res = await fetch("/api/material/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lessonId, key }),
+        body: form,
+        credentials: "same-origin",
       });
-      if (!confRes.ok) {
-        const j = (await confRes.json()) as { error?: string };
-        throw new Error(j.error ?? "Gagal menyimpan materi");
+      const data = await readJson<{ error?: string; contentRef?: string }>(res);
+      if (!res.ok) {
+        throw new Error(data.error ?? "Gagal meng-upload materi");
       }
-      const conf = (await confRes.json()) as { contentRef: string };
+      if (!data.contentRef) {
+        throw new Error("Upload berhasil tetapi contentRef kosong");
+      }
 
       setDone(true);
-      onDone?.(conf.contentRef);
+      onDone?.(data.contentRef);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Terjadi kesalahan");
     } finally {
