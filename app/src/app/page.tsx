@@ -85,31 +85,50 @@ const CATEGORIES = [
 export default async function Home() {
   const session = await auth();
 
-  const featured = await db
-    .select({
-      id: courses.id,
-      title: courses.title,
-      slug: courses.slug,
-      description: courses.description,
-      price: courses.price,
-      category: courses.category,
-      instructorName: users.name,
-      instructorImage: users.image,
-    })
-    .from(courses)
-    .leftJoin(users, eq(courses.instructorId, users.id))
-    .where(eq(courses.status, "published"))
-    .orderBy(desc(courses.createdAt))
-    .limit(3);
+  let featured: {
+    id: string;
+    title: string;
+    slug: string;
+    description: string | null;
+    price: number;
+    category: string | null;
+    instructorName: string | null;
+    instructorImage: string | null;
+  }[] = [];
+  let categoryRows: { category: string | null; count: number }[] = [];
 
-  const categoryRows = await db
-    .select({
-      category: courses.category,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(courses)
-    .where(eq(courses.status, "published"))
-    .groupBy(courses.category);
+  // Development lokal tetap dapat menampilkan landing page saat PostgreSQL
+  // belum aktif; production tetap memakai data kursus aktual.
+  try {
+    [featured, categoryRows] = await Promise.all([
+      db
+        .select({
+          id: courses.id,
+          title: courses.title,
+          slug: courses.slug,
+          description: courses.description,
+          price: courses.price,
+          category: courses.category,
+          instructorName: users.name,
+          instructorImage: users.image,
+        })
+        .from(courses)
+        .leftJoin(users, eq(courses.instructorId, users.id))
+        .where(eq(courses.status, "published"))
+        .orderBy(desc(courses.createdAt))
+        .limit(3),
+      db
+        .select({
+          category: courses.category,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(courses)
+        .where(eq(courses.status, "published"))
+        .groupBy(courses.category),
+    ]);
+  } catch {
+    console.warn("Landing: database tidak tersedia, memakai konten demo.");
+  }
 
   const categoryCountMap = new Map(
     categoryRows
@@ -144,7 +163,7 @@ export default async function Home() {
     <div className="min-h-screen overflow-x-hidden bg-background font-body text-on-surface">
       <LandingHeader user={session?.user ?? null} />
 
-      <main className="pt-20">
+      <main>
         {/* Hero */}
         <section className="relative overflow-hidden pt-20 pb-32">
           <div className="absolute inset-0 z-0">

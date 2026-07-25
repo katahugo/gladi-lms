@@ -105,6 +105,8 @@
   --spacing-unit-6: 24px;
   --spacing-margin-desktop: 40px;
   --spacing-container-max: 1280px;
+  --spacing-stack-lg: 32px;
+  --spacing-stack-md: 16px;
 
   --radius-DEFAULT: 0.25rem;
   --radius-lg: 0.5rem;
@@ -129,12 +131,72 @@
 }
 
 .soft-float {
-  box-shadow: 0px 4px 20px rgba(0, 109, 67, 0.08);
-  transition: transform 0.3s ease;
+  box-shadow: 0px 4px 20px rgba(0, 109, 67, 0.05);
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .soft-float:hover {
   transform: translateY(-4px);
+  box-shadow: 0px 10px 40px rgba(0, 109, 67, 0.1);
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, #006d43 0%, #00d084 100%);
+}
+
+.bg-tech-gradient {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(0, 208, 132, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(73, 75, 214, 0.03) 0%, transparent 50%);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(222, 226, 230, 0.5);
+}
+
+@keyframes gladi-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float {
+  animation: gladi-float 3s ease-in-out infinite;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #ced4da;
+  border-radius: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float {
+    animation: none;
+  }
+}
+
+select.catalog-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%233c4a40'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.25rem;
 }
 
 .glass-card {

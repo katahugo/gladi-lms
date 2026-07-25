@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Bundle esbuild (worker & migrate) — bukan source code.
+    "dist/**",
   ]),
 ]);
 
