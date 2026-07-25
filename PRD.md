@@ -1,9 +1,11 @@
 # PRD — Platform LMS Penjualan Kursus Digital
-**Versi:** 2.0 — Self-Hosted di Azure VPS
-**Status:** Infrastruktur inti live (23 Jul 2026, `https://gladi.id`) — fitur MVP dalam pengerjaan
+**Versi:** 2.1 — Self-Hosted di Azure VPS + Planning Dashboard Backend
+**Status:** Infrastruktur & MVP inti live (23 Jul 2026, `https://gladi.id`) — fokus dashboard Admin & Instruktur menjadi fokus berikutnya
 **Skala target:** Produksi (production-grade), fitur lengkap, infrastruktur self-managed
 
 > Perubahan dari v1.0: seluruh infrastruktur (aplikasi + database) dipindahkan ke **1 VPS Azure milik sendiri**, tidak lagi memakai Vercel maupun Supabase. Autentikasi memakai library open-source gratis, bukan Supabase Auth.
+>
+> **v2.1:** menambahkan §13 — planning lengkap **Dashboard Backend** (panel Admin + Instruktur) dalam satu dokumen PRD ini, termasuk baseline yang sudah ada, gap, spesifikasi halaman, API, fase pengerjaan, dan kriteria penerimaan.
 
 ---
 
@@ -44,11 +46,9 @@ Sama seperti v1.0 — tidak ada perubahan fitur, hanya perubahan infrastruktur. 
 - Forum diskusi & rating kursus
 - Notifikasi email (+ opsional WhatsApp)
 - SEO & landing page promosi
-- **Dashboard Admin** — statistik global platform (total user, kursus, enrollment, sertifikat, pendapatan, transaksi pending), daftar user terbaru, daftar transaksi terkini, sidebar navigasi ke sub-halaman manajemen
-- **Manajemen User** — tabel semua user dengan dropdown ubah role (student/instructor/admin/support), admin tidak bisa mengubah role sendiri
-- **Manajemen Transaksi** — tabel transaksi (order ref, kursus, user, jumlah, metode pembayaran, status, waktu) untuk rekonsiliasi dan support
-- **Manajemen Kupon** — form buat kupon diskon (kode, tipe percent/fixed, nilai, maxUses, kedaluwarsa), daftar kupon dengan toggle aktif/nonaktif dan hapus
-- **Dashboard Instruktur** — statistik kursus milik instruktur (total kursus, enrollment, pendapatan, sertifikat), daftar kursus terbaru, pendaftaran terkini, halaman progres siswa per kursus
+- **Dashboard Backend (Admin & Instruktur)** — spesifikasi lengkap di **§13** (baseline, gap, IA, API, fase, acceptance criteria)
+  - **Admin** — overview platform, user, transaksi, kupon; perluasan: kursus global, moderasi, laporan
+  - **Instruktur** — overview milik sendiri, kelola kursus; perluasan: course builder kurikulum, upload konten, kuis builder, diskusi, penilaian essay, progres siswa
 
 ---
 
@@ -297,16 +297,249 @@ Karena tidak lagi pakai managed hosting, berikut yang perlu disiapkan tim secara
 
 ## 12. Langkah Selanjutnya
 
-> **Status per 23 Juli 2026:** infrastruktur inti **sudah go-live** di `https://gladi.id` (Tahap A & B dari `EXECUTION-STEPS.md` selesai). Item di bawah diperbarui untuk mencerminkan kenyataan terkini.
+> **Status per 25 Juli 2026:** infrastruktur + MVP inti + keandalan dasar **sudah go-live** di `https://gladi.id`. Fokus produk berikutnya: **Dashboard Backend Admin & Instruktur** (§13).
 
-Selesai:
-1. ~~Provisioning VPS Azure~~ — VM `vm-gladi-lms` (B2ms, Indonesia Central, IP `70.153.16.78`) aktif.
-2. ~~Setup domain + Cloudflare~~ — `gladi.id` proxied, SSL Full (strict), sertifikat Let's Encrypt terbit.
-3. ~~Bangun `docker-compose.yml`~~ — Nginx, Next.js app, worker, PostgreSQL, Redis, MinIO semuanya berjalan.
-4. ~~Implementasi Auth.js~~ — credentials + Google OAuth + RBAC middleware selesai (Tahap A6).
+Selesai (ringkas):
+1. ~~Provisioning VPS Azure + domain/SSL/Cloudflare~~
+2. ~~Docker Compose (app, worker, Postgres, Redis, MinIO, Nginx, Uptime Kuma)~~
+3. ~~Auth.js + RBAC + CI/CD + backup/restore + monitoring dasar~~
+4. ~~Fitur MVP C/E: katalog, video, materi, Midtrans, learn, kuis, forum, rating, sertifikat, kupon, landing~~
+5. ~~Dashboard Admin dasar (stats, user, transaksi, kupon + sidebar) & Dashboard Instruktur dasar (stats, list kursus, progres siswa)~~
 
-Berikutnya (sesuai roadmap `EXECUTION-STEPS.md`):
-5. **Aktifkan CI/CD** — isi 4 secrets GitHub (`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY`) agar pipeline build→push→deploy berjalan otomatis (tersisa dari B6).
-6. **Fitur inti MVP (Tahap C)** — katalog kursus, integrasi Cloudflare Stream, upload materi MinIO, checkout Midtrans/Xendit, enrollment + progress tracking.
-7. **Tentukan pilihan final video hosting** — keputusan awal: Cloudflare Stream (PRD §6.3 Opsi A); finalisasi berdasarkan estimasi jam tonton bulanan saat Tahap C2.
-8. **Setup backup terjadwal & monitoring (Tahap D)** — skrip `backup.sh`/`restore.sh` sudah siap (A8); aktivasi cron harian + Uptime Kuma + Sentry wajib sebelum go-live publik penuh.
+Berikutnya (urut prioritas — detail di §13.7):
+6. **F0 — Shell Instruktur** — layout sidebar + navigasi konsisten (paritas dengan Admin).
+7. **F1 — Course Builder kurikulum** — CRUD modul/lesson + pasang uploader video/materi + kuis builder UI.
+8. **F2 — Operasional Instruktur** — diskusi, penilaian essay, filter progres siswa.
+9. **F3 — Perluasan Admin** — kelola kursus global, moderasi, laporan/export ringan.
+10. **F4 — Hardening panel** — refresh role JWT, pagination/filter, empty/error states, audit trail ringan.
+
+---
+
+## 13. Planning — Dashboard Backend (Admin & Instruktur)
+
+> Dokumen planning digabung di PRD ini agar satu sumber kebenaran.  
+> **Tujuan:** menjadikan panel internal (bukan situs publik) cukup lengkap agar Admin mengoperasikan platform dan Instruktur membangun serta mengelola kursus end-to-end tanpa akses langsung ke database.
+
+### 13.1 Definisi & Ruang Lingkup
+
+| Istilah | Arti di proyek ini |
+|---|---|
+| **Dashboard Backend** | Panel web internal di route `/admin/*` dan `/instructor/*` (bukan micro-service terpisah) |
+| **Admin Panel** | Operasi platform: user, transaksi, kupon, oversight kursus, moderasi, laporan |
+| **Instructor Panel** | Operasi konten: course builder, upload, kuis, siswa, diskusi, penilaian |
+| **Shell** | Layout sidebar + header identitas role + navigasi bersama |
+
+**In scope (F0–F4):** shell, authoring kurikulum, wiring upload/kuis, operasional instruktur, perluasan admin, hardening UX/RBAC panel.
+
+**Out of scope (fase ini):** portal Support/CS penuh, live class, chat real-time, SCORM/LTI, multi-gateway Xendit, redesign brand landing publik, mobile app native.
+
+### 13.2 Baseline Saat Ini (sudah ada di kode)
+
+| Area | Status | Lokasi utama |
+|---|---|---|
+| Admin shell (sidebar) | Ada | `app/src/app/admin/layout.tsx` — Dashboard, User, Transaksi, Kupon |
+| Admin overview | Ada | `/admin` + `getAdminStats()` |
+| Admin user/role | Ada | `/admin/users` + `PATCH /api/admin/users/[id]` |
+| Admin transaksi | Ada | `/admin/transactions` (read-only list) |
+| Admin kupon | Ada | `/admin/coupons` + API CRUD |
+| Instructor overview | Ada | `/instructor/dashboard` + `getInstructorStats()` |
+| Instructor course metadata | Ada | `/instructor/courses` (+ new/edit) — draft/publish/archive |
+| Instructor student progress | Ada | `/instructor/courses/[id]/students` |
+| Instructor shell (sidebar) | **Belum** | Tidak ada `instructor/layout.tsx` |
+| CRUD modul/lesson UI | **Belum** | Schema + read path ada; tidak ada insert/update UI |
+| Video/Material uploader di UI | **Parsial** | Komponen ada; belum terpasang di halaman instruktur |
+| Kuis builder UI | **Parsial** | API `POST /api/instructor/quizzes/[lessonId]` ada; UI authoring belum |
+| Penilaian essay | **Belum** | Auto-grade menunda skor essay; tidak ada UI/API grade manual |
+| Moderasi diskusi (panel) | **Parsial** | API resolve/delete ada; belum ada inbox instruktur/admin |
+| Kelola kursus global (admin) | **Belum** | Admin bisa lihat semua di list instruktur jika role admin, tapi tidak ada halaman admin khusus |
+
+### 13.3 Prinsip Desain Panel
+
+1. **Satu app, dua shell** — Admin dan Instruktur tetap di Next.js yang sama; beda prefix route + RBAC.
+2. **Defense in depth** — middleware route + `requireRole` / `requireInstructor` di page/API + ownership check (`courses.instructorId`).
+3. **Admin boleh masuk area instruktur** — untuk support; data tetap difilter konteks (milik kursus / global sesuai halaman).
+4. **Server-first** — page SSR + Server Actions / Route Handlers; hindari dashboard SPA terpisah.
+5. **Reuse komponen yang sudah ada** — `VideoUploader`, `MaterialUploader`, `QuizPanel` (mode author), pola sidebar Admin.
+6. **Satu job per halaman** — overview ≠ tabel manajemen ≠ builder kurikulum.
+7. **Tidak menambah service baru** — tidak ada admin-BFF terpisah; API tetap di `app/src/app/api`.
+
+### 13.4 Information Architecture
+
+#### Admin (`/admin`)
+
+| Route | Tujuan | Prioritas |
+|---|---|---|
+| `/admin` | Overview statistik + aktivitas terkini | Ada (refine F3/F4) |
+| `/admin/users` | Manajemen role user | Ada |
+| `/admin/transactions` | Rekonsiliasi & support pembayaran | Ada (+ filter F3) |
+| `/admin/coupons` | CRUD kupon | Ada |
+| `/admin/courses` | Oversight semua kursus (status, instruktur, force archive) | F3 |
+| `/admin/moderation` | Antrian diskusi/report ringan | F3 |
+| `/admin/reports` | Laporan pendapatan/enrollment (rentang tanggal, export CSV) | F3 |
+
+#### Instruktur (`/instructor`)
+
+| Route | Tujuan | Prioritas |
+|---|---|---|
+| `/instructor/dashboard` | Overview milik instruktur | Ada (+ shell F0) |
+| `/instructor/courses` | Daftar kursus + aksi status | Ada |
+| `/instructor/courses/new` | Buat metadata kursus | Ada |
+| `/instructor/courses/[id]/edit` | Edit metadata | Ada |
+| `/instructor/courses/[id]/curriculum` | **Builder modul & lesson** | **F1 (inti)** |
+| `/instructor/courses/[id]/students` | Progres siswa | Ada (+ filter F2) |
+| `/instructor/courses/[id]/discussions` | Inbox diskusi per kursus | F2 |
+| `/instructor/courses/[id]/grading` | Antrian essay belum dinilai | F2 |
+| `/instructor/quizzes/[lessonId]` | Editor kuis (atau embedded di curriculum) | F1 |
+
+**Navigasi shell Instruktur (F0):** Dashboard · Kursus Saya · (konteks kursus muncul sebagai sub-nav di halaman kurikulum).
+
+### 13.5 Spesifikasi Fitur
+
+#### A. Shell & Akses (F0)
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| A1 | `instructor/layout.tsx` dengan sidebar + email user | Paritas UX dengan Admin; non-instructor/admin di-redirect |
+| A2 | Highlight nav aktif berdasarkan pathname | Link aktif visually distinct |
+| A3 | Admin tetap bisa akses `/instructor/*` | Tidak 403; ownership tetap dihormati untuk mutasi konten orang lain kecuali mode admin eksplisit |
+| A4 | Link masuk panel dari `/dashboard` atau header (role-aware) | Student tidak melihat link Admin/Instructor |
+
+#### B. Course Builder Kurikulum (F1) — *critical path*
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| B1 | CRUD modul: judul, `sort_order`, drag/reorder atau naik-turun | Modul tersimpan; urutan konsisten di `/learn` & katalog |
+| B2 | CRUD lesson: tipe `video` \| `text` \| `quiz` \| `assignment`, judul, urutan, teks konten (untuk `text`) | Lesson muncul di learn page sesuai tipe |
+| B3 | Pasang `VideoUploader` pada lesson video → confirm → `content_ref = cf:{uid}` | Playback di `/learn` berhasil untuk enrolled |
+| B4 | Pasang `MaterialUploader` pada lesson text/file → `content_ref = s3:{key}` | Download signed URL jalan |
+| B5 | UI kuis builder memanggil API instructor quizzes | Soal MC/T-F/essay tersimpan; siswa bisa submit |
+| B6 | Guard ownership: hanya owner (atau admin) yang mutasi kurikulum | User lain mendapat 403 |
+| B7 | Validasi publish: blokir/peringatkan publish bila kursus tanpa modul/lesson | UX jelas; tidak memutus alur draft |
+
+**API baru yang dibutuhkan (F1):**
+
+| Method | Path | Fungsi |
+|---|---|---|
+| `GET/POST` | `/api/instructor/courses/[id]/modules` | List / buat modul |
+| `PATCH/DELETE` | `/api/instructor/modules/[moduleId]` | Update / hapus (+ cascade lesson) |
+| `POST` | `/api/instructor/modules/[moduleId]/lessons` | Buat lesson |
+| `PATCH/DELETE` | `/api/instructor/lessons/[lessonId]` | Update / hapus lesson |
+| `POST` | `/api/instructor/modules/reorder` (atau batch PATCH) | Reorder modul/lesson |
+
+> Endpoint video/material/quiz yang sudah ada **dipakai ulang**; F1 fokusanya menghubungkan UI + menambah CRUD struktur.
+
+#### C. Operasional Instruktur (F2)
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| C1 | Inbox diskusi per kursus (filter unresolved) | Instruktur resolve/hapus dari panel |
+| C2 | Halaman grading essay: list attempt `submitted` dengan soal essay | Instruktur input skor + feedback; status jadi `graded` |
+| C3 | Progres siswa: filter by status / search nama-email | Tabel tetap usable saat enrollment banyak |
+| C4 | Ringkasan per siswa: lesson selesai / total, last activity | Satu klik dari daftar siswa |
+
+**API baru (F2):**
+
+| Method | Path | Fungsi |
+|---|---|---|
+| `GET` | `/api/instructor/courses/[id]/discussions` | List thread kursus |
+| `GET` | `/api/instructor/courses/[id]/grading` | List attempt perlu dinilai |
+| `PATCH` | `/api/instructor/quiz-attempts/[id]` | Set skor essay + feedback |
+
+#### D. Perluasan Admin (F3)
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| D1 | `/admin/courses` — list semua kursus, filter status/instruktur | Admin bisa archive / unpublish |
+| D2 | Filter transaksi: status, rentang tanggal, search ref/email | Support bisa temukan order cepat |
+| D3 | `/admin/moderation` — thread diskusi terbaru / flagged sederhana | Hapus konten melanggar tanpa SQL |
+| D4 | `/admin/reports` — pendapatan & enrollment per periode + export CSV | File CSV terunduh; angka cocok dengan stats |
+
+#### E. Hardening Panel (F4)
+
+| ID | Requirement | Acceptance |
+|---|---|---|
+| E1 | Refresh role di session setelah admin ubah role (re-issue JWT / force re-login hint) | Role baru berlaku tanpa kebingungan akses |
+| E2 | Pagination + empty/error states di semua tabel panel | Tidak ada list tak terbatas tanpa kontrol |
+| E3 | Audit log ringan (opsional): siapa mengubah role / status kursus | Queryable di DB atau log terstruktur |
+| E4 | Konsistensi visual shell Admin ↔ Instruktur | Spacing, typography, nav pattern selaras |
+
+### 13.6 Model Data & Aturan Bisnis (relevan panel)
+
+Tidak ada migrasi besar di F0–F1 (schema sudah mendukung modul/lesson/quiz). F2 mungkin menambah kolom:
+
+| Perubahan | Kapan | Keterangan |
+|---|---|---|
+| `quiz_attempts.feedback` (text, nullable) | F2 | Feedback instruktur untuk essay |
+| `quiz_attempts.graded_by` / `graded_at` | F2 | Jejak penilai |
+| `discussions.is_flagged` (boolean) | F3 opsional | Antrian moderasi sederhana |
+| Tabel `admin_audit_logs` | F4 opsional | `actor_id`, `action`, `entity`, `payload`, `created_at` |
+
+**Aturan:**
+- Mutasi kurikulum hanya owner atau `admin`.
+- Publish kursus: status `published` hanya jika ada ≥1 lesson (peringatan keras di F1; enforce di API di F4 bila perlu).
+- Essay: skor awal `null`; course completion / certificate tidak mengandalkan essay belum dinilai kecuali passing rule eksplisit (tetap perilaku MVP: auto-grade hanya MC/T-F).
+- Admin tidak dapat mengubah role dirinya sendiri (sudah ada — dipertahankan).
+
+### 13.7 Fase Pengerjaan
+
+| Fase | Nama | Deliverable utama | Ketergantungan |
+|---|---|---|---|
+| **F0** | Shell Instruktur | `instructor/layout.tsx`, nav, link role-aware | Tidak ada |
+| **F1** | Course Builder | Halaman kurikulum + API modul/lesson + wiring uploader & kuis | F0 disarankan |
+| **F2** | Operasional Instruktur | Diskusi inbox, grading essay, filter siswa | F1 (butuh lesson/quiz nyata) |
+| **F3** | Perluasan Admin | Courses oversight, filter transaksi, moderasi, reports CSV | F0; F1 opsional |
+| **F4** | Hardening | JWT role refresh, pagination, audit, polish | Setelah F1–F3 inti |
+
+**Urutan implementasi yang disarankan:** F0 → F1 → F2 → F3 → F4.  
+F3 (admin courses/filter) bisa diparalelkan dengan F2 setelah F0 selesai.
+
+### 13.8 Non-Goals & Keputusan yang Ditunda
+
+| Topik | Keputusan untuk fase ini |
+|---|---|
+| App admin terpisah (domain `admin.gladi.id`) | Ditunda — tetap path `/admin` di app yang sama |
+| WYSIWYG kaya (block editor) untuk lesson text | Markdown/textarea dulu; editor kaya nanti |
+| Drag-and-drop library berat | Naik/turun urutan cukup di F1; DnD boleh menyusul |
+| Assignment submission penuh | Lesson type `assignment` boleh dibuat; alur pengumpulan file siswa ditunda |
+| Portal Support (`/support`) | Di luar scope §13; role tetap ada di enum |
+| Realtime dashboard (WebSocket) | Tidak — poll/SSR refresh cukup |
+
+### 13.9 Risiko & Mitigasi (khusus panel)
+
+| Risiko | Mitigasi |
+|---|---|
+| Instruktur tidak bisa jual konten karena builder belum ada | Prioritaskan F1 sebagai critical path |
+| Hapus modul cascade menghapus progress siswa | Konfirmasi UI + soft-warning; pertimbangkan block delete jika ada progress (F4) |
+| Admin salah unpublish kursus berbayar | Konfirmasi + audit log (F4) |
+| Upload video gagal di VPS kecil | Tetap direct-to-Cloudflare (TUS); UI progress/error jelas |
+| Role JWT stale setelah promosi user | E1 di F4; interim: minta re-login setelah ubah role |
+
+### 13.10 Kriteria Penerimaan Global (§13)
+
+Panel dianggap **siap dipakai operasional konten** bila:
+
+1. Instruktur membuat kursus → menambah modul/lesson → upload video/materi → buat kuis → publish → siswa enrolled bisa belajar end-to-end **tanpa intervensi SQL/MinIO manual**.
+2. Admin mengelola user, transaksi, kupon, dan dapat men-unpublish/archive kursus bermasalah dari UI.
+3. Semua route panel terlindungi RBAC; ownership lesson/kursus ditegakkan di API.
+4. Tidak ada regresi pada alur publik: katalog, checkout, `/learn`, sertifikat, webhook Midtrans.
+5. Typecheck + lint + build CI hijau setelah tiap fase.
+
+### 13.11 Pelacak Eksekusi Singkat
+
+Gunakan checklist ini saat implementasi (boleh dipindah ke `EXECUTION-STEPS-*.md` terpisah, tetapi spesifikasi tetap mengacu ke §13):
+
+| ID | Item | Fase | Status |
+|---|---|---|---|
+| P1 | Shell sidebar instruktur | F0 | ⬜ |
+| P2 | API + UI CRUD modul/lesson + reorder | F1 | ⬜ |
+| P3 | Wiring VideoUploader + MaterialUploader di kurikulum | F1 | ⬜ |
+| P4 | UI kuis builder (instructor) | F1 | ⬜ |
+| P5 | Inbox diskusi instruktur | F2 | ⬜ |
+| P6 | Grading essay + kolom feedback | F2 | ⬜ |
+| P7 | Admin courses oversight | F3 | ⬜ |
+| P8 | Filter transaksi + reports CSV | F3 | ⬜ |
+| P9 | Refresh role session + pagination tabel | F4 | ⬜ |
+
+---
+
+*Akhir PRD v2.1 — planning Dashboard Backend Admin & Instruktur.*
