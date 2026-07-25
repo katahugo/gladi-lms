@@ -68,10 +68,50 @@ export async function presignDownload(key: string, expiresInSeconds = 900): Prom
   });
 }
 
+/** Upload objek dari server (dipakai proxy upload browser → app → MinIO). */
+export async function putObject(
+  key: string,
+  body: Buffer | Uint8Array,
+  contentType: string,
+): Promise<void> {
+  const s3 = client();
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/** Ambil objek dari MinIO (untuk proxy download ke browser). */
+export async function getObject(key: string) {
+  const s3 = client();
+  return s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
 /** Hapus sebuah objek (mis. saat materi diganti/dihapus). */
 export async function deleteObject(key: string): Promise<void> {
   const s3 = client();
   await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+/** Infer MIME dari ekstensi bila browser mengirim file.type kosong. */
+export function inferContentType(filename: string, fallback = "application/octet-stream"): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    webp: "image/webp",
+    zip: "application/zip",
+    txt: "text/plain",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  return map[ext] ?? fallback;
 }
 
 /** Bangun object key yang rapi & ter-namespace per konteks. */

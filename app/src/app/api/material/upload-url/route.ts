@@ -3,18 +3,27 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { lessons, modules, courses } from "@/db/schema";
-import { requireInstructor } from "@/lib/guards";
-import { buildKey, ensureBucket, isS3Configured, presignUpload } from "@/lib/storage";
+import { requireApiInstructor } from "@/lib/guards";
+import {
+  buildKey,
+  ensureBucket,
+  inferContentType,
+  isS3Configured,
+  presignUpload,
+} from "@/lib/storage";
 
 /**
  * POST /api/material/upload-url — minta signed URL untuk upload materi (PDF/gambar).
- * Body: { lessonId: string, filename: string, contentType: string }
+ * Body: { lessonId: string, filename: string, contentType?: string }
  *
- * Hanya instruktur pemilik kursus (atau admin). Mengembalikan uploadUrl (PUT)
- * dan object key yang nantinya disimpan sebagai referensi materi.
+ * DEPRECATED untuk browser di VPS: MinIO internal tidak reachable dari client.
+ * Prefer POST /api/material/upload (proxy). Endpoint ini tetap ada untuk tooling internal.
  */
 export async function POST(req: Request) {
-  const user = await requireInstructor();
+  const authz = await requireApiInstructor();
+  if (!authz.ok) return authz.response;
+  const user = authz.user;
+
   if (!isS3Configured()) {
     return NextResponse.json({ error: "MinIO/S3 belum dikonfigurasi (env S3_* belum diisi)" }, { status: 503 });
   }
@@ -25,14 +34,14 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Body bukan JSON valid" }, { status: 400 });
   }
-  const { lessonId, filename, contentType } = (body ?? {}) as Record<string, unknown>;
-  if (
-    typeof lessonId !== "string" ||
-    typeof filename !== "string" || !filename.trim() ||
-    typeof contentType !== "string" || !contentType.trim()
-  ) {
-    return NextResponse.json({ error: "lessonId, filename, dan contentType wajib diisi" }, { status: 400 });
+  const { lessonId, filename, contentType: rawType } = (body ?? {}) as Record<string, unknown>;
+  if (typeof lessonId !== "string" || typeof filename !== "string" || !filename.trim()) {
+    return NextResponse.json({ error: "lessonId dan filename wajib diisi" }, { status: 400 });
   }
+  const contentType =
+    typeof rawType === "string" && rawType.trim()
+      ? rawType.trim()
+      : inferContentType(filename);
 
   // Batasi tipe materi yang diizinkan (dokumen & gambar, bukan video — video ke Stream)
   const allowed = [

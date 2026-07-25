@@ -74,6 +74,18 @@ server {
         include /etc/nginx/includes/proxy_common.conf;
     }
 
+    # ---- Upload materi (proxy ke MinIO via app): body besar ----
+    location /api/material/ {
+        limit_req zone=api burst=20 nodelay;
+        set $upstream_app http://app:3000;
+        proxy_pass $upstream_app;
+        include /etc/nginx/includes/proxy_common.conf;
+        client_max_body_size 50m;
+        proxy_request_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
     # ---- API lain: rate limit longgar ----
     location /api/ {
         limit_req zone=api burst=50 nodelay;
