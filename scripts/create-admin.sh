@@ -2,9 +2,13 @@
 # =============================================================================
 # create-admin.sh — Buat user admin pertama di Gladi LMS.
 #
-# Registrasi endpoint hanya membuat role "student" (by design). Role admin
-# harus diangkat langsung via database. Skrip ini melakukan keduanya dalam
-# satu perintah.
+# Registrasi endpoint hanya membuat role "student" (by design). Skrip ini
+# memanfaatkan endpoint registrasi untuk membuat akun (password di-hash oleh
+# aplikasi), LALU mempromosikan role ke "admin" via database.
+#
+# Kenapa tidak hash manual? bcryptjs mungkin tidak tersedia di image standalone
+# Next.js, sehingga hash yang di-generate container tidak cocok dengan hash
+# yang diharapkan Auth.js credentials provider.
 #
 # Pemakaian:
 #   ./scripts/create-admin.sh admin@gladi.id "Admin Name" "secure-password"
@@ -51,21 +55,25 @@ if [ -n "$EXISTING" ]; then
   exit 0
 fi
 
-# 2. Buat user baru langsung via DB (bypass endpoint registrasi)
-# Password di-hash bcrypt — kita pakai bcryptjs via Node one-liner
-HASH="$(docker run --rm --network "$(docker inspect lms_postgres --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')" \
-  --entrypoint node \
-  "$(docker inspect --format='{{.Config.Image}}' lms_app 2>/dev/null || echo 'ghcr.io/katahugo/gladi-lms/app:latest')" \
-  -e "const b=require('bcryptjs');console.log(b.hashSync('$PASSWORD',12))" 2>/dev/null)"
+# 2. Registrasi via API (password di-hash oleh aplikasi — pasti cocok)
+echo "    Mendaftarkan via API..."
+REG_RESP="$(curl -s -w "\nHTTP=%{http_code}" -X POST http://localhost/api/register \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$NAME\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")"
 
-if [ -z "$HASH" ]; then
-  echo "GALAT: Gagal generate password hash — pastikan container app ada" >&2
+HTTP_CODE="$(echo "$REG_RESP" | grep HTTP= | cut -d= -f2)"
+BODY="$(echo "$REG_RESP" | grep -v HTTP=)"
+
+if [ "$HTTP_CODE" != "201" ]; then
+  echo "    GALAT: Registrasi gagal (HTTP $HTTP_CODE): $BODY" >&2
   exit 1
 fi
 
+echo "    Registrasi berhasil (HTTP 201)"
+
+# 3. Promosikan ke admin
 docker exec lms_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
-  "INSERT INTO users (name, email, password_hash, role, email_verified, created_at, updated_at)
-   VALUES ('$NAME', '$EMAIL', '$HASH', 'admin', now(), now(), now());" >/dev/null
+  "UPDATE users SET role='admin', updated_at=now() WHERE email='$EMAIL';" >/dev/null
 
 echo ""
 echo "==> User admin berhasil dibuat!"
