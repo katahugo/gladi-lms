@@ -56,10 +56,10 @@ if [ -n "$EXISTING" ]; then
 fi
 
 # 2. Registrasi via API (password di-hash oleh aplikasi — pasti cocok).
-#    Panggil container app langsung via port internal 3000 di network Docker
-#    (bukan http://localhost yang di-redirect ke HTTPS oleh Nginx → 301).
+#    Panggil via docker compose exec ke container nginx (pasti punya curl)
+#    ke port 3000 internal app, menghindari redirect HTTP→HTTPS.
 echo "    Mendaftarkan via API..."
-REG_RESP="$(docker compose exec -T app curl -s -w '\nHTTP=%{http_code}' -X POST http://localhost:3000/api/register \
+REG_RESP="$(docker compose exec -T nginx curl -s -w '\nHTTP=%{http_code}' -X POST http://app:3000/api/register \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"$NAME\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")"
 
