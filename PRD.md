@@ -530,10 +530,10 @@ Gunakan checklist ini saat implementasi (boleh dipindah ke `EXECUTION-STEPS-*.md
 
 | ID | Item | Fase | Status |
 |---|---|---|---|
-| P1 | Shell sidebar instruktur | F0 | ⬜ |
-| P2 | API + UI CRUD modul/lesson + reorder | F1 | ⬜ |
-| P3 | Wiring VideoUploader + MaterialUploader di kurikulum | F1 | ⬜ |
-| P4 | UI kuis builder (instructor) | F1 | ⬜ |
+| P1 | Shell sidebar instruktur | F0 | ✅ |
+| P2 | API + UI CRUD modul/lesson + reorder | F1 | ✅ |
+| P3 | Wiring VideoUploader + MaterialUploader di kurikulum | F1 | ✅ |
+| P4 | UI kuis builder (instructor) | F1 | ✅ |
 | P5 | Inbox diskusi instruktur | F2 | ⬜ |
 | P6 | Grading essay + kolom feedback | F2 | ⬜ |
 | P7 | Admin courses oversight | F3 | ⬜ |

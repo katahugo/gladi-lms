@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { db } from "@/db";
@@ -20,7 +21,15 @@ export default async function EditCoursePage({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
-      <h1 className="mb-8 text-2xl font-bold text-white">Edit Kursus</h1>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-white">Edit Kursus</h1>
+        <Link
+          href={`/instructor/courses/${id}/curriculum`}
+          className="rounded-lg bg-violet-600/20 px-4 py-2 text-sm font-medium text-violet-300 hover:bg-violet-600/30"
+        >
+          Kelola Kurikulum
+        </Link>
+      </div>
       <CourseForm course={course} />
     </div>
   );
